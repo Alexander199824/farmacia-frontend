@@ -1,0 +1,68 @@
+/* src/styles.css */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f0f0f0;
+  }
+  header {
+    background-color: #003366;
+    color: white;
+    padding: 1em;
+    text-align: center;
+  }
+  nav {
+    background-color: #004080;
+    padding: 0.5em;
+  }
+  nav ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+  }
+  nav ul li {
+    margin: 0 1em;
+  }
+  nav ul li a {
+    color: white;
+    text-decoration: none;
+  }
+  .search-bar {
+    text-align: center;
+    margin: 1em 0;
+  }
+  .search-bar input {
+    padding: 0.5em;
+    width: 50%;
+  }
+  .search-bar button {
+    padding: 0.5em 1em;
+    background-color: #cc0000;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  .main-content, .dashboard-content {
+    padding: 1em;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .product {
+    background-color: white;
+    border: 1px solid #ddd;
+    padding: 1em;
+    margin: 1em 0;
+    text-align: center;
+  }
+  footer {
+    background-color: #003366;
+    color: white;
+    text-align: center;
+    padding: 1em;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+  }
+  
