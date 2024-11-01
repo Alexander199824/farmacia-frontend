@@ -6,10 +6,10 @@ import { loadStripe } from '@stripe/stripe-js';
 import HomePage from './components/HomePage';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
-import CheckoutPage from './components/CheckoutPage'; // Importa la nueva página de checkout
+
 
 // Load your Stripe publishable key
-const stripePromise = loadStripe('pk_test_51Q9AMkB3EtWqqOZ24k1VyZOOgpCNnVY0CunpMiDNtdS9auObuqik24wzWMIJd09gWmvqSgfs55j1A8MPXtCiBjEf00zin7p46b');
+const stripePromise = loadStripe('pk_test_51Q9AMkB3EtWqqOZ2sr4dExyPgtFOgL7UBEAVEiuUbKdBFaNQSCivO5lTntoXL7DO6vxSjlRio5frb1MrqtztSg68007Hlq6at0');
 
 const App = () => {
   const [isAuth, setIsAuth] = useState(false);
@@ -73,10 +73,7 @@ const App = () => {
             path="/dashboard"
             element={isAuth ? <Dashboard /> : <Navigate to="/login" />}
           />
-          <Route 
-            path="/checkout" 
-            element={<CheckoutPage cartItems={cartItems} onConfirmPurchase={() => {/* lógica de confirmación */}} />} 
-          />
+          
         </Routes>
       </Elements>
     </Router>

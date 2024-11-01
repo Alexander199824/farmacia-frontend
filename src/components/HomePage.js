@@ -50,9 +50,10 @@ const HomePage = () => {
 
   useEffect(() => {
     localStorage.setItem('cart', JSON.stringify(cart));
-    setTotalAmount(
-      Object.values(cart).reduce((sum, product) => sum + product.price * product.quantity, 0)
+    const calculatedTotal = Object.values(cart).reduce(
+      (sum, product) => sum + product.price * product.quantity, 0
     );
+    setTotalAmount(calculatedTotal); // Actualiza el totalAmount
   }, [cart]);
 
   const handleQuantityChange = (productId, quantity) => {
@@ -190,7 +191,6 @@ const HomePage = () => {
         )}
       </div>
 
-      {/* Detalle del carrito visible solo al hacer clic en el icono */}
       <div className={`cart ${cartVisible ? 'cart-visible' : ''}`}>
         <h2>Carrito de Compras</h2>
         {Object.keys(cart).length === 0 ? (
@@ -222,7 +222,8 @@ const HomePage = () => {
         <CustomerModal
           onClose={() => setShowCustomerModal(false)}
           onConfirmPurchase={confirmPurchase}
-          cartItems={Object.values(cart)} // Pasar los artículos del carrito al modal
+          cartItems={Object.values(cart)}
+          totalAmount={totalAmount} // Aquí pasamos totalAmount a CustomerModal
         />
       )}
 

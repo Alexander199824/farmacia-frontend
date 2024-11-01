@@ -1,30 +1,103 @@
-// CustomerModal.js
 import React, { useState } from 'react';
+import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
+import axios from 'axios';
 
-const CustomerModal = ({ onClose, onConfirmPurchase, cartItems }) => {
-  const [customerData, setCustomerData] = useState({ username: '', password: '' });
+const CustomerModal = ({ onClose, cartItems, totalAmount = 0 }) => {
+  const [customerData, setCustomerData] = useState({ username: '', password: '', clientDPI: '' });
   const [isFinalConsumer, setIsFinalConsumer] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('');
   const [shippingMethod, setShippingMethod] = useState('');
-  const [cardDetails, setCardDetails] = useState({ cardNumber: '', expiry: '', cvv: '' });
   const [shippingAddress, setShippingAddress] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleConfirm = () => {
-    onConfirmPurchase({
-      ...customerData,
-      paymentMethod,
-      shippingMethod,
-      cardDetails: paymentMethod === 'tarjeta' ? cardDetails : null,
-      shippingAddress: shippingMethod === 'domicilio' ? shippingAddress : null,
-    });
-    onClose();
+  const stripe = useStripe();
+  const elements = useElements();
+  const baseURL = 'https://farmacia-backend.onrender.com/api/payments';
+
+  const handleConfirm = async () => {
+    if (!stripe || !elements) {
+      alert('Stripe no está cargado aún. Por favor, intenta de nuevo más tarde.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Convertir totalAmount a número y manejar valores inválidos
+      const amountInCents = Math.round(Number(totalAmount) * 100);
+      if (isNaN(amountInCents) || amountInCents <= 0) {
+        throw new Error('TotalAmount no es un número válido');
+      }
+
+      const paymentIntentData = {
+        amount: amountInCents,
+        clientId: customerData.id || 1,
+        sellerDPI: '1234567890123',
+        clientDPI: customerData.clientDPI,
+        paymentMethod: 'stripe',
+        items: cartItems.map((item) => ({
+          productId: item.id,
+          quantity: item.quantity,
+          unitPrice: parseFloat(item.price).toFixed(2), // Asegura formato decimal
+        })),
+      };
+
+      console.log('Datos enviados a /create-payment-intent:', paymentIntentData);
+
+      // Solicita el intento de pago al backend
+      const { data: { clientSecret } } = await axios.post(`${baseURL}/create-payment-intent`, paymentIntentData);
+
+      console.log('Client Secret recibido:', clientSecret);
+
+      if (paymentMethod === 'tarjeta') {
+        const card = elements.getElement(CardElement);
+
+        const result = await stripe.confirmCardPayment(clientSecret, {
+          payment_method: {
+            card: card,
+            billing_details: {
+              name: customerData.username,
+            },
+          },
+        });
+
+        console.log('Resultado de confirmación de pago:', result);
+
+        if (result.error) {
+          alert(`Error en el pago: ${result.error.message}`);
+        } else if (result.paymentIntent.status === 'succeeded') {
+          // Crear la factura en el backend tras el pago exitoso
+          await axios.post(`${baseURL}/create-invoice`, {
+            clientId: customerData.id || 1,
+            sellerDPI: '1234567890123',
+            clientDPI: customerData.clientDPI,
+            paymentMethod: 'stripe',
+            items: cartItems.map((item) => ({
+              productId: item.id,
+              quantity: item.quantity,
+              unitPrice: parseFloat(item.price).toFixed(2), // Asegura formato decimal
+              totalPrice: parseFloat(item.price * item.quantity).toFixed(2) // Calcula y asegura formato decimal
+            })),
+          });
+          alert('Pago realizado con éxito y factura creada. ¡Gracias por tu compra!');
+        }
+      } else {
+        alert('Compra realizada con éxito usando método de pago alternativo.');
+      }
+
+      onClose();
+    } catch (error) {
+      console.error('Error en el proceso de compra:', error);
+      alert('Hubo un problema al procesar la compra.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="modal-overlay">
       <div className="modal">
         <h2>Completar Compra</h2>
-        
         <label>
           <input
             type="checkbox"
@@ -48,6 +121,12 @@ const CustomerModal = ({ onClose, onConfirmPurchase, cartItems }) => {
               value={customerData.password}
               onChange={(e) => setCustomerData({ ...customerData, password: e.target.value })}
             />
+            <input
+              type="text"
+              placeholder="DPI del Cliente"
+              value={customerData.clientDPI}
+              onChange={(e) => setCustomerData({ ...customerData, clientDPI: e.target.value })}
+            />
           </>
         )}
 
@@ -58,30 +137,9 @@ const CustomerModal = ({ onClose, onConfirmPurchase, cartItems }) => {
           <option value="efectivo">Efectivo</option>
         </select>
 
-        {/* Detalles de tarjeta solo si elige Tarjeta de Crédito */}
         {paymentMethod === 'tarjeta' && (
           <div className="payment-details">
-            <label>Número de Tarjeta:</label>
-            <input
-              type="text"
-              placeholder="Número de Tarjeta"
-              value={cardDetails.cardNumber}
-              onChange={(e) => setCardDetails({ ...cardDetails, cardNumber: e.target.value })}
-            />
-            <label>Fecha de Expiración:</label>
-            <input
-              type="text"
-              placeholder="MM/AA"
-              value={cardDetails.expiry}
-              onChange={(e) => setCardDetails({ ...cardDetails, expiry: e.target.value })}
-            />
-            <label>CVV:</label>
-            <input
-              type="text"
-              placeholder="CVV"
-              value={cardDetails.cvv}
-              onChange={(e) => setCardDetails({ ...cardDetails, cvv: e.target.value })}
-            />
+            <CardElement />
           </div>
         )}
 
@@ -92,7 +150,6 @@ const CustomerModal = ({ onClose, onConfirmPurchase, cartItems }) => {
           <option value="recoger">Recoger en Tienda</option>
         </select>
 
-        {/* Dirección de envío solo si elige Envío a Domicilio */}
         {shippingMethod === 'domicilio' && (
           <div className="shipping-details">
             <label>Dirección de Envío:</label>
@@ -105,7 +162,6 @@ const CustomerModal = ({ onClose, onConfirmPurchase, cartItems }) => {
           </div>
         )}
 
-        {/* Resumen de Productos */}
         <div className="product-summary">
           <h3>Resumen de Productos</h3>
           {cartItems.map((item) => (
@@ -116,8 +172,10 @@ const CustomerModal = ({ onClose, onConfirmPurchase, cartItems }) => {
           <p><strong>Total: Q{cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)}</strong></p>
         </div>
 
-        <button className="confirm" onClick={handleConfirm}>Confirmar Compra</button>
-        <button className="cancel" onClick={onClose}>Cancelar</button>
+        <button className="confirm" onClick={handleConfirm} disabled={loading}>
+          {loading ? 'Procesando...' : 'Confirmar Compra'}
+        </button>
+        <button className="cancel" onClick={onClose} disabled={loading}>Cancelar</button>
       </div>
     </div>
   );
