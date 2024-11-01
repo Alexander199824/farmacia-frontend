@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import '../css/homePage.css';
 import axios from 'axios';
 import cartImage from '../imagenes/shoppingcart_77968.png';
+import CustomerModal from './CustomerModal';
 
 const HomePage = () => {
   const [products, setProducts] = useState([]);
@@ -9,8 +10,9 @@ const HomePage = () => {
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [cart, setCart] = useState(JSON.parse(localStorage.getItem('cart')) || {});
   const [totalAmount, setTotalAmount] = useState(0);
-  const [cartVisible, setCartVisible] = useState(false); // Control de visibilidad del carrito
+  const [cartVisible, setCartVisible] = useState(false);
   const [quantities, setQuantities] = useState({});
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
 
   const baseURL = 'https://farmacia-backend.onrender.com/api';
 
@@ -98,7 +100,16 @@ const HomePage = () => {
     });
   };
 
-  const handlePurchase = async () => {
+  const handlePurchase = () => {
+    if (Object.keys(cart).length === 0) {
+      alert('Aún no tienes nada en el carrito');
+    } else {
+      setShowCustomerModal(true); // Abrir el modal si el carrito no está vacío
+    }
+  };
+
+  const confirmPurchase = async (customerData) => {
+    setShowCustomerModal(false); // Cierra el modal después de confirmar los datos
     try {
       await Promise.all(
         Object.values(cart).map(async (item) => {
@@ -107,7 +118,7 @@ const HomePage = () => {
           });
         })
       );
-      alert('Compra realizada con éxito!');
+      alert(`Compra realizada con éxito para ${customerData.username}!`);
       setCart({});
     } catch (error) {
       console.error('Error updating stock:', error);
@@ -182,27 +193,39 @@ const HomePage = () => {
       {/* Detalle del carrito visible solo al hacer clic en el icono */}
       <div className={`cart ${cartVisible ? 'cart-visible' : ''}`}>
         <h2>Carrito de Compras</h2>
-        <ul>
-          {Object.values(cart).map((item) => (
-            <li key={item.id}>
-              {item.name} - Q{item.price} x 
-              <input
-                type="number"
-                min="1"
-                max={item.stock}
-                value={item.quantity}
-                onChange={(e) => updateCartQuantity(item.id, parseInt(e.target.value, 10))}
-                className="cart-quantity-input"
-              />
-              = Q{item.price * item.quantity}
-              <button onClick={() => removeFromCart(item.id)} className="remove-item-button">Eliminar</button>
-            </li>
-          ))}
-        </ul>
+        {Object.keys(cart).length === 0 ? (
+          <p>Aún no tienes nada en el carrito</p>
+        ) : (
+          <ul>
+            {Object.values(cart).map((item) => (
+              <li key={item.id}>
+                {item.name} - Q{item.price} x 
+                <input
+                  type="number"
+                  min="1"
+                  max={item.stock}
+                  value={item.quantity}
+                  onChange={(e) => updateCartQuantity(item.id, parseInt(e.target.value, 10))}
+                  className="cart-quantity-input"
+                />
+                = Q{item.price * item.quantity}
+                <button onClick={() => removeFromCart(item.id)} className="remove-item-button">Eliminar</button>
+              </li>
+            ))}
+          </ul>
+        )}
         <p>Total a pagar: Q{totalAmount}</p>
         <button onClick={handlePurchase} className="purchase-button">Realizar Compra</button>
       </div>
       
+      {showCustomerModal && (
+        <CustomerModal
+          onClose={() => setShowCustomerModal(false)}
+          onConfirmPurchase={confirmPurchase}
+          cartItems={Object.values(cart)} // Pasar los artículos del carrito al modal
+        />
+      )}
+
       <footer>
         <p>&copy; 2024 Mi Farmacia Online. Todos los derechos reservados.</p>
       </footer>

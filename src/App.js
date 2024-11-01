@@ -1,14 +1,16 @@
 // src/App.js
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from './components/HomePage';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
+import CheckoutPage from './components/CheckoutPage'; // Importa la nueva página de checkout
 
 const App = () => {
   const [isAuth, setIsAuth] = useState(false);
   const [timer, setTimer] = useState(null);
   const [logoutMessage, setLogoutMessage] = useState('');
+  const [cartItems, setCartItems] = useState([]); // Ejemplo de items en el carrito
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -64,6 +66,10 @@ const App = () => {
         <Route
           path="/dashboard"
           element={isAuth ? <Dashboard /> : <Navigate to="/login" />}
+        />
+        <Route 
+          path="/checkout" 
+          element={<CheckoutPage cartItems={cartItems} onConfirmPurchase={() => {/* lógica de confirmación */}} />} 
         />
       </Routes>
     </Router>
