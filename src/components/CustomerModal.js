@@ -55,7 +55,6 @@ const CustomerModal = ({ onClose, onConfirmPurchase, cartItems }) => {
         <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
           <option value="">Selecciona una opción</option>
           <option value="tarjeta">Tarjeta de Crédito</option>
-          <option value="paypal">PayPal</option>
           <option value="efectivo">Efectivo</option>
         </select>
 

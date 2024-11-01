@@ -1,20 +1,19 @@
+
 // src/components/CheckoutForm.js
 import React from 'react';
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 
-const CheckoutForm = ({ onPaymentSuccess }) => {
+const CheckoutForm = ({ onPaymentSuccess, clientSecret }) => {
   const stripe = useStripe();
   const elements = useElements();
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!stripe || !elements) return;
+    if (!stripe || !elements || !clientSecret) return;
 
-    // Aquí realizarías la lógica de creación de un PaymentIntent y confirmación de pago.
-    // Por ejemplo:
     const cardElement = elements.getElement(CardElement);
 
-    const { paymentIntent, error } = await stripe.confirmCardPayment('{CLIENT_SECRET}', {
+    const { paymentIntent, error } = await stripe.confirmCardPayment(clientSecret, {
       payment_method: {
         card: cardElement,
         billing_details: {
@@ -25,7 +24,7 @@ const CheckoutForm = ({ onPaymentSuccess }) => {
 
     if (error) {
       console.error(error);
-    } else if (paymentIntent.status === 'succeeded') {
+    } else if (paymentIntent && paymentIntent.status === 'succeeded') {
       onPaymentSuccess();
     }
   };
@@ -33,7 +32,7 @@ const CheckoutForm = ({ onPaymentSuccess }) => {
   return (
     <form onSubmit={handleSubmit}>
       <CardElement />
-      <button type="submit" disabled={!stripe}>
+      <button type="submit" disabled={!stripe || !clientSecret}>
         Pagar
       </button>
     </form>
