@@ -34,7 +34,7 @@ const App = () => {
     const newTimer = setTimeout(() => {
       setLogoutMessage('La sesión se ha cerrado por inactividad.');
       handleLogout();
-    }, 30000000); // 30 minutos en milisegundos
+    }, 3000000); // 30 minutos en milisegundos
     setTimer(newTimer);
   };
 

@@ -55,14 +55,24 @@ const styles = {
     cursor: 'pointer',
     transition: 'background-color 0.3s ease'
   },
-  buttonHover: {
-    backgroundColor: '#45a049'
+  toggleLink: {
+    color: '#007bff',
+    cursor: 'pointer',
+    fontSize: '14px',
+    marginTop: '10px'
   }
 };
 
 const Login = ({ setAuth, logoutMessage }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [dpi, setDpi] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [image, setImage] = useState(null); // Estado para la imagen
+  const [isLoginMode, setIsLoginMode] = useState(true);
   const [message, setMessage] = useState(logoutMessage || '');
   const navigate = useNavigate();
 
@@ -76,18 +86,52 @@ const Login = ({ setAuth, logoutMessage }) => {
     e.preventDefault();
     try {
       const response = await axios.post('https://farmacia-backend.onrender.com/api/users/login', { username, password });
+      
+      // Guarda el token solo en el login, no en el registro
       localStorage.setItem('token', response.data.token);
-
-      // Extraer rol y DPI del token decodificado
       const { role, dpi } = JSON.parse(atob(response.data.token.split('.')[1]));
       localStorage.setItem('role', role);
-      localStorage.setItem('dpi', dpi); // Guardar el DPI del usuario
+      localStorage.setItem('dpi', dpi);
 
       setAuth(true);
-      setMessage(''); // Limpia el mensaje después de iniciar sesión
+      setMessage('');
       navigate('/dashboard');
     } catch (error) {
       alert('Credenciales incorrectas');
+    }
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    try {
+      const formData = new FormData();
+      formData.append('username', username);
+      formData.append('password', password);
+      formData.append('role', 'cliente');
+      formData.append('userType', 'cliente');
+      formData.append('dpi', dpi);
+      formData.append('name', name);
+      formData.append('birthDate', '1990-01-01'); // Puedes hacer esto un campo de entrada si es necesario
+      formData.append('email', email);
+      formData.append('phone', phone);
+      formData.append('address', address);
+      if (image) {
+        formData.append('image', image); // Solo envía la imagen si existe
+      }
+
+      // Realiza el registro de usuario y cliente
+      await axios.post('https://farmacia-backend.onrender.com/api/users/register', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      await axios.post('https://farmacia-backend.onrender.com/api/clients', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      alert('Cuenta de cliente creada con éxito. Inicia sesión ahora.');
+      setIsLoginMode(true);
+    } catch (error) {
+      console.error('Error al registrar cliente:', error.response?.data || error.message);
+      alert(`Error al registrar cliente: ${error.response?.data?.message || error.message}`);
     }
   };
 
@@ -95,14 +139,62 @@ const Login = ({ setAuth, logoutMessage }) => {
     <div style={styles.container}>
       <div style={styles.loginForm}>
         {message && <p style={styles.logoutMessage}>{message}</p>}
-        <h2 style={styles.title}>Iniciar Sesión</h2>
-        <form onSubmit={handleLogin}>
+        <h2 style={styles.title}>{isLoginMode ? 'Iniciar Sesión' : 'Registrar Cliente'}</h2>
+        <form onSubmit={isLoginMode ? handleLogin : handleRegister}>
+          {!isLoginMode && (
+            <>
+              <input
+                type="text"
+                placeholder="Nombre Completo"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                style={styles.input}
+                required
+              />
+              <input
+                type="text"
+                placeholder="DPI"
+                value={dpi}
+                onChange={(e) => setDpi(e.target.value)}
+                style={styles.input}
+                required
+              />
+              <input
+                type="email"
+                placeholder="Correo Electrónico"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={styles.input}
+                required
+              />
+              <input
+                type="text"
+                placeholder="Teléfono"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                style={styles.input}
+              />
+              <input
+                type="text"
+                placeholder="Dirección"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                style={styles.input}
+              />
+              <input
+                type="file"
+                onChange={(e) => setImage(e.target.files[0])} // Guardar imagen seleccionada
+                style={styles.input}
+              />
+            </>
+          )}
           <input
             type="text"
             placeholder="Usuario"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             style={styles.input}
+            required
           />
           <input
             type="password"
@@ -110,9 +202,15 @@ const Login = ({ setAuth, logoutMessage }) => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             style={styles.input}
+            required
           />
-          <button type="submit" style={styles.button}>Login</button>
+          <button type="submit" style={styles.button}>
+            {isLoginMode ? 'Login' : 'Registrar'}
+          </button>
         </form>
+        <p style={styles.toggleLink} onClick={() => setIsLoginMode(!isLoginMode)}>
+          {isLoginMode ? '¿No tienes cuenta? Regístrate aquí' : '¿Ya tienes cuenta? Inicia sesión'}
+        </p>
       </div>
     </div>
   );
