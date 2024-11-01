@@ -1,45 +1,66 @@
-// src/components/HomePage.js
 import React, { useState, useEffect } from 'react';
 import '../css/homePage.css';
 import axios from 'axios';
 
 const HomePage = () => {
+  const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [totalAmount, setTotalAmount] = useState(0);
   const [clientDPI, setClientDPI] = useState('');
   const [cartVisible, setCartVisible] = useState(false);
+  const [quantities, setQuantities] = useState({});
 
-  // URL base del backend
-  const backendUrl = 'https://farmacia-backend.onrender.com';
+  const baseURL = 'https://farmacia-backend.onrender.com/api';
 
-  // Toggle visibility of the cart
-  const toggleCartVisibility = () => setCartVisible(!cartVisible);
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await axios.get(`${baseURL}/products`);
+        const productsWithImages = response.data.map((product) => ({
+          ...product,
+          image: `data:image/jpeg;base64,${btoa(
+            new Uint8Array(product.image.data).reduce(
+              (data, byte) => data + String.fromCharCode(byte),
+              ''
+            )
+          )}`,
+        }));
+        setProducts(productsWithImages);
+        setFilteredProducts(productsWithImages);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      }
+    };
 
-  // Fetch products based on search term
-  const handleSearch = async () => {
-    try {
-      const response = await axios.get(`${backendUrl}/api/products?search=${searchTerm}`);
-      setSearchResults(response.data);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-    }
+    fetchProducts();
+  }, []);
+
+  useEffect(() => {
+    setFilteredProducts(
+      products.filter((product) =>
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    );
+  }, [searchTerm, products]);
+
+  const handleQuantityChange = (productId, quantity) => {
+    setQuantities((prevQuantities) => ({
+      ...prevQuantities,
+      [productId]: quantity,
+    }));
   };
 
-  // Add product to cart
   const addToCart = (product) => {
-    setCart((prevCart) => [...prevCart, product]);
-    setTotalAmount((prevTotal) => prevTotal + product.price);
+    const quantity = parseInt(quantities[product.id] || 1, 10);
+    const newItems = Array(quantity).fill(product);
+    setCart((prevCart) => [...prevCart, ...newItems]);
+    setTotalAmount((prevTotal) => prevTotal + product.price * quantity);
   };
 
-  // Handle purchase creation
   const handlePurchase = async () => {
-    if (!clientDPI) {
-      alert("Por favor, ingrese el DPI del cliente antes de realizar la compra.");
-      return;
-    }
-
     try {
       const invoiceData = {
         clientDPI,
@@ -50,15 +71,15 @@ const HomePage = () => {
           unitPrice: product.price,
         })),
       };
-      await axios.post(`${backendUrl}/api/invoices/create`, invoiceData);
-      alert('¡Compra realizada con éxito!');
+      await axios.post(`${baseURL}/invoices/create`, invoiceData);
+      alert('Purchase successful!');
       setCart([]);
       setTotalAmount(0);
       setClientDPI('');
-      setCartVisible(false); // Hide cart after purchase
+      setCartVisible(false);
     } catch (error) {
       console.error('Error creating purchase:', error);
-      alert('Hubo un problema al completar la compra');
+      alert('Failed to complete the purchase');
     }
   };
 
@@ -66,8 +87,7 @@ const HomePage = () => {
     <div>
       <header>
         <h1>Mi Farmacia Online</h1>
-        {/* Cart Icon with Product Count */}
-        <div className="cart-icon" onClick={toggleCartVisibility}>
+        <div className="cart-icon" onClick={() => setCartVisible(!cartVisible)}>
           <i className="fas fa-shopping-cart"></i>
           {cart.length > 0 && <span className="cart-count">{cart.length}</span>}
         </div>
@@ -89,21 +109,29 @@ const HomePage = () => {
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Buscar productos..."
         />
-        <button onClick={handleSearch}>Buscar</button>
       </div>
-      <div className="main-content">
-        {searchResults.length > 0 ? (
-          searchResults.map((product) => (
+      <div className="product-grid">
+        {filteredProducts.length > 0 ? (
+          filteredProducts.map((product) => (
             <div key={product.id} className="product">
               <img
-                src={`data:image/jpeg;base64,${product.image}`}
+                src={product.image}
                 alt={product.name}
                 className="product-image"
               />
               <h2>{product.name}</h2>
               <p>{product.description}</p>
-              <p>Precio: ${product.price}</p>
-              <button onClick={() => addToCart(product)}>Agregar al carrito</button>
+              <p>Precio: Q{product.price}</p> {/* Cambiado a símbolo de quetzal */}
+              <input
+                type="number"
+                min="1"
+                value={quantities[product.id] || 1}
+                onChange={(e) => handleQuantityChange(product.id, e.target.value)}
+                className="quantity-input"
+              />
+              <button onClick={() => addToCart(product)} className="add-to-cart-button">
+                Agregar al carrito
+              </button>
             </div>
           ))
         ) : (
@@ -116,11 +144,11 @@ const HomePage = () => {
           <ul>
             {cart.map((item, index) => (
               <li key={index}>
-                {item.name} - ${item.price}
+                {item.name} - Q{item.price}
               </li>
             ))}
           </ul>
-          <p>Total a pagar: ${totalAmount.toFixed(2)}</p>
+          <p>Total a pagar: Q{totalAmount}</p>
           <input
             type="text"
             value={clientDPI}

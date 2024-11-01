@@ -1,68 +1,190 @@
-/* src/styles.css */
+/* Estilos generales */
 body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: #f0f0f0;
-  }
-  header {
-    background-color: #003366;
-    color: white;
-    padding: 1em;
-    text-align: center;
-  }
-  nav {
-    background-color: #004080;
-    padding: 0.5em;
-  }
-  nav ul {
-    list-style-type: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    justify-content: center;
-  }
-  nav ul li {
-    margin: 0 1em;
-  }
-  nav ul li a {
-    color: white;
-    text-decoration: none;
-  }
-  .search-bar {
-    text-align: center;
-    margin: 1em 0;
-  }
-  .search-bar input {
-    padding: 0.5em;
-    width: 50%;
-  }
-  .search-bar button {
-    padding: 0.5em 1em;
-    background-color: #cc0000;
-    color: white;
-    border: none;
-    cursor: pointer;
-  }
-  .main-content, .dashboard-content {
-    padding: 1em;
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-  .product {
-    background-color: white;
-    border: 1px solid #ddd;
-    padding: 1em;
-    margin: 1em 0;
-    text-align: center;
-  }
-  footer {
-    background-color: #003366;
-    color: white;
-    text-align: center;
-    padding: 1em;
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-  }
-  
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f0f0f0;
+}
+header {
+  background-color: #003366;
+  color: white;
+  padding: 1em;
+  text-align: center;
+}
+nav {
+  background-color: #004080;
+  padding: 0.5em;
+}
+nav ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+}
+nav ul li {
+  margin: 0 1em;
+}
+nav ul li a {
+  color: white;
+  text-decoration: none;
+}
+
+/* Barra de búsqueda */
+.search-bar {
+  text-align: center;
+  margin: 1em 0;
+}
+.search-bar input {
+  padding: 0.5em;
+  width: 50%;
+}
+.search-bar button {
+  padding: 0.5em 1em;
+  background-color: #cc0000;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+/* Contenido principal */
+.main-content, .dashboard-content {
+  padding: 1em;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.product {
+  background-color: white;
+  border: 1px solid #ddd;
+  padding: 1em;
+  margin: 1em 0;
+  text-align: center;
+}
+
+/* Estilos del icono de carrito */
+.cart-icon {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+.cart-icon i {
+  font-size: 1.5em;
+  color: white;
+}
+.cart-count {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background-color: #cc0000;
+  color: white;
+  border-radius: 50%;
+  padding: 2px 6px;
+  font-size: 0.8em;
+  display: none; /* Se muestra solo si hay productos en el carrito */
+}
+.cart-icon:hover .cart-count {
+  display: block; /* Muestra el contador al pasar el cursor */
+}
+
+/* Estilos del carrito de compras */
+.cart {
+  background-color: white;
+  border: 1px solid #ddd;
+  padding: 1em;
+  max-width: 300px;
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+  display: none; /* Solo se muestra cuando el carrito está visible */
+  z-index: 1000;
+}
+.cart h2 {
+  margin-top: 0;
+  color: #003366;
+}
+.cart ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+.cart ul li {
+  margin-bottom: 0.5em;
+}
+.cart button {
+  width: 100%;
+  padding: 0.5em;
+  background-color: #cc0000;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+.cart p {
+  font-weight: bold;
+  color: #333;
+}
+
+/* Estilos para el footer */
+footer {
+  background-color: #003366;
+  color: white;
+  text-align: center;
+  padding: 1em;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1em;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.product {
+  background-color: white;
+  border: 1px solid #ddd;
+  padding: 1em;
+  text-align: center;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+.product-image {
+  width: 100px;   /* Reducido a 100px */
+  height: 100px;  /* Reducido a 100px */
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 0.5em;
+}
+
+.quantity-input {
+  width: 60px;
+  padding: 0.5em;
+  margin-top: 0.5em;
+  text-align: center;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.add-to-cart-button {
+  background-color: #28a745;
+  color: white;
+  padding: 0.5em 1em;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s;
+  margin-top: 0.5em;
+}
+
+.add-to-cart-button:hover {
+  background-color: #218838;
+}
+
+.add-to-cart-button:active {
+  background-color: #1e7e34;
+}
