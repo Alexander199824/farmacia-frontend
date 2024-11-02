@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 import axios from 'axios';
 
-const CustomerModal = ({ onClose, cartItems, totalAmount = 0 }) => {
+const CustomerModal = ({ onClose, cartItems, totalAmount = 0, clearCart }) => { // Añadido clearCart como prop
   const [customerData, setCustomerData] = useState({ username: '', password: '', clientDPI: '' });
   const [isFinalConsumer, setIsFinalConsumer] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -75,14 +75,16 @@ const CustomerModal = ({ onClose, cartItems, totalAmount = 0 }) => {
             items: cartItems.map((item) => ({
               productId: item.id,
               quantity: item.quantity,
-              unitPrice: parseFloat(item.price).toFixed(2), // Asegura formato decimal
-              totalPrice: parseFloat(item.price * item.quantity).toFixed(2) // Calcula y asegura formato decimal
+              unitPrice: parseFloat(item.price).toFixed(2),
+              totalPrice: parseFloat(item.price * item.quantity).toFixed(2)
             })),
           });
           alert('Pago realizado con éxito y factura creada. ¡Gracias por tu compra!');
+          clearCart(); // Llama a clearCart después de la compra
         }
       } else {
         alert('Compra realizada con éxito usando método de pago alternativo.');
+        clearCart(); // Llama a clearCart después de la compra
       }
 
       onClose();

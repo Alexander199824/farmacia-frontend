@@ -4,6 +4,7 @@ import axios from 'axios';
 import cartImage from '../imagenes/shoppingcart_77968.png';
 import CustomerModal from './CustomerModal';
 
+
 const HomePage = () => {
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,8 +54,13 @@ const HomePage = () => {
     const calculatedTotal = Object.values(cart).reduce(
       (sum, product) => sum + product.price * product.quantity, 0
     );
-    setTotalAmount(calculatedTotal); // Actualiza el totalAmount
+    setTotalAmount(calculatedTotal);
   }, [cart]);
+
+  const clearCart = () => {
+    setCart({});
+    localStorage.removeItem('cart');
+  };
 
   const handleQuantityChange = (productId, quantity) => {
     setQuantities((prevQuantities) => ({
@@ -105,25 +111,7 @@ const HomePage = () => {
     if (Object.keys(cart).length === 0) {
       alert('Aún no tienes nada en el carrito');
     } else {
-      setShowCustomerModal(true); // Abrir el modal si el carrito no está vacío
-    }
-  };
-
-  const confirmPurchase = async (customerData) => {
-    setShowCustomerModal(false); // Cierra el modal después de confirmar los datos
-    try {
-      await Promise.all(
-        Object.values(cart).map(async (item) => {
-          await axios.put(`${baseURL}/products/${item.id}/updateStock`, {
-            stock: item.stock - item.quantity,
-          });
-        })
-      );
-      alert(`Compra realizada con éxito para ${customerData.username}!`);
-      setCart({});
-    } catch (error) {
-      console.error('Error updating stock:', error);
-      alert('Hubo un problema al actualizar el stock.');
+      setShowCustomerModal(true);
     }
   };
 
@@ -139,11 +127,7 @@ const HomePage = () => {
       </header>
       <nav>
         <ul>
-          <li><a href="#">Inicio</a></li>
-          <li><a href="#">Productos</a></li>
-          <li><a href="#">Promociones</a></li>
-          <li><a href="#">Salud</a></li>
-          <li><a href="#">Nosotros</a></li>
+ 
           <li><a href="/login"><i className="fas fa-user"></i> Login</a></li>
           <li className="cart-icon" onClick={() => setCartVisible(!cartVisible)}>
             <img src={cartImage} alt="Carrito de Compras" className="cart-image" />
@@ -221,9 +205,9 @@ const HomePage = () => {
       {showCustomerModal && (
         <CustomerModal
           onClose={() => setShowCustomerModal(false)}
-          onConfirmPurchase={confirmPurchase}
           cartItems={Object.values(cart)}
-          totalAmount={totalAmount} // Aquí pasamos totalAmount a CustomerModal
+          totalAmount={totalAmount}
+          clearCart={clearCart} // Pasar clearCart como prop
         />
       )}
 

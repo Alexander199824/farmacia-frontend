@@ -4,6 +4,8 @@ import Workers from './workers.js';
 import Products from './Products.js';
 import Users from './Users.js';
 import Invoices from './Invoices.js'; // Importación de Invoices
+import Invoiceslist from './InvoiceList.js'; // Importación de Invoices
+import HomePage from './HomePage.js'; // Importación correcta
 import '../css/dashboard.css';
 
 const Dashboard = ({ setAuth }) => {
@@ -30,12 +32,17 @@ const Dashboard = ({ setAuth }) => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
     localStorage.removeItem('dpi');
-    setAuth(false);
-    navigate('/homePage');
+    
+    if (typeof setAuth === 'function') {
+      setAuth(false);
+    } else {
+      console.error("setAuth is not defined as a function.");
+    }
+    navigate('/homePage'); // Redirige usando React Router con la ruta correcta
   };
 
-  const showContent = (content) => {
-    setContent(content);
+  const showContent = (selectedContent) => {
+    setContent(selectedContent);
   };
 
   const toggleNav = () => {
@@ -79,6 +86,11 @@ const Dashboard = ({ setAuth }) => {
               <li>
                 <a href="#" onClick={() => showContent('Gestionar Trabajadores')}>
                   <span className="title">TRABAJADORES</span>
+                </a>
+              </li>
+              <li>
+                <a href="#" onClick={() => showContent('Ver Facturas')}>
+                  <span className="title">FACTURAS</span>
                 </a>
               </li>
               <li>
@@ -126,6 +138,13 @@ const Dashboard = ({ setAuth }) => {
           {content === 'Gestionar Productos' && <Products />}
           {content === 'Gestionar Usuarios' && <Users />}
           {content === 'Registrar Ventas' && <Invoices />} {/* Renderizar Invoices en Registrar Ventas */}
+          {content === 'Ver Facturas' && <Invoiceslist />} {/* Renderizar InvoiceList para Ver Facturas */}
+          {content === 'Mis Compras' && (
+            <div>
+              <h2>Mis Compras</h2>
+              <p>Detalle de compras realizadas por el cliente.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

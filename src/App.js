@@ -7,7 +7,6 @@ import HomePage from './components/HomePage';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 
-
 // Load your Stripe publishable key
 const stripePromise = loadStripe('pk_test_51Q9AMkB3EtWqqOZ2sr4dExyPgtFOgL7UBEAVEiuUbKdBFaNQSCivO5lTntoXL7DO6vxSjlRio5frb1MrqtztSg68007Hlq6at0');
 
@@ -71,9 +70,8 @@ const App = () => {
           <Route path="/login" element={<Login setAuth={setIsAuth} logoutMessage={logoutMessage} />} />
           <Route
             path="/dashboard"
-            element={isAuth ? <Dashboard /> : <Navigate to="/login" />}
+            element={isAuth ? <Dashboard setAuth={setIsAuth} /> : <Navigate to="/login" />}
           />
-          
         </Routes>
       </Elements>
     </Router>

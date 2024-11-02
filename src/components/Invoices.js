@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 
-const Invoices = ({ sellerDPI }) => {
+const Invoices = () => {
   const [formData, setFormData] = useState({
     clientDPI: '',
     clientName: '',
@@ -14,8 +15,49 @@ const Invoices = ({ sellerDPI }) => {
   const [product, setProduct] = useState({ id: '', name: '', price: 0, quantity: 1 });
   const [total, setTotal] = useState(0);
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [sellerInfo, setSellerInfo] = useState({ dpi: '', name: '' });
 
-  // Obtener el nombre del cliente por DPI
+  const stripe = useStripe();
+  const elements = useElements();
+
+  useEffect(() => {
+    fetchSellerInfo();
+  }, []);
+
+  useEffect(() => {
+    if (productSearch) {
+      fetchProductSuggestions(productSearch);
+    } else {
+      setProductSuggestions([]);
+    }
+  }, [productSearch]);
+
+  const fetchSellerInfo = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setMessage('No hay sesión activa. Por favor inicie sesión.');
+        return;
+      }
+
+      const response = await axios.get(
+        'https://farmacia-backend.onrender.com/api/users/profile',
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      setSellerInfo({
+        dpi: response.data.dpi,
+        name: response.data.name
+      });
+    } catch (error) {
+      setMessage('Error al obtener información del vendedor.');
+      console.error('Error:', error);
+    }
+  };
+
   const fetchClientName = async (dpi) => {
     try {
       const response = await axios.get(`https://farmacia-backend.onrender.com/api/clients/by-dpi/${dpi}`);
@@ -25,25 +67,34 @@ const Invoices = ({ sellerDPI }) => {
     }
   };
 
+  const fetchProductSuggestions = async (search) => {
+    try {
+      const response = await axios.get(`https://farmacia-backend.onrender.com/api/products?search=${search}`);
+      setProductSuggestions(response.data);
+    } catch (error) {
+      setMessage('Error al obtener productos.');
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
 
     if (name === 'clientDPI') {
-      fetchClientName(value); // Buscar el nombre del cliente automáticamente al ingresar el DPI
+      fetchClientName(value);
     }
   };
 
   const handleProductChange = (e) => {
     setProductSearch(e.target.value);
-    setMessage(''); // Limpiar mensaje
+    setMessage('');
   };
 
   const selectProduct = (selectedProduct) => {
     setProduct({
       id: selectedProduct.id,
       name: selectedProduct.name,
-      price: selectedProduct.price,
+      price: parseFloat(selectedProduct.price),
       quantity: 1,
     });
     setProductSearch('');
@@ -73,13 +124,21 @@ const Invoices = ({ sellerDPI }) => {
     setProduct({ ...product, quantity: Number(e.target.value) });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const createInvoice = async (paymentIntentId = null) => {
     const token = localStorage.getItem('token');
     try {
-      await axios.post('https://farmacia-backend.onrender.com/api/invoices', { ...formData, sellerDPI }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.post(
+        'https://farmacia-backend.onrender.com/api/invoices',
+        {
+          ...formData,
+          sellerDPI: sellerInfo.dpi,
+          paymentIntentId,
+          total: total
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       alert("Factura creada exitosamente.");
       setFormData({
         clientDPI: '',
@@ -90,7 +149,78 @@ const Invoices = ({ sellerDPI }) => {
       });
       setTotal(0);
     } catch (error) {
-      setMessage(`Error al guardar la factura: ${error.response ? error.response.data.message : error.message}`);
+      throw new Error(`Error al guardar la factura: ${error.response ? error.response.data.message : error.message}`);
+    }
+  };
+
+  const handleStripePayment = async () => {
+    if (!stripe || !elements) {
+      setMessage('El procesador de pagos no está disponible.');
+      return false;
+    }
+
+    setLoading(true);
+    const token = localStorage.getItem('token');
+
+    try {
+      // Create payment intent
+      const paymentIntentResponse = await axios.post(
+        'https://farmacia-backend.onrender.com/api/payments/create-payment-intent',
+        {
+          amount: Math.round(total * 100),
+          clientDPI: formData.clientDPI,
+          paymentMethod: 'stripe',
+          items: formData.items.map(item => ({
+            productId: item.id,
+            quantity: item.quantity,
+            unitPrice: item.price,
+          })),
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const { clientSecret } = paymentIntentResponse.data;
+
+      // Confirm card payment
+      const card = elements.getElement(CardElement);
+      const result = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: card,
+          billing_details: {
+            name: formData.clientName,
+          },
+        },
+      });
+
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
+      return result.paymentIntent.id;
+    } catch (error) {
+      throw new Error(`Error en el pago: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      if (formData.paymentMethod === 'stripe') {
+        const paymentIntentId = await handleStripePayment();
+        if (paymentIntentId) {
+          await createInvoice(paymentIntentId);
+        }
+      } else {
+        await createInvoice();
+      }
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -101,7 +231,8 @@ const Invoices = ({ sellerDPI }) => {
       {message && <div style={styles.messageBox}>{message}</div>}
 
       <div style={styles.infoBox}>
-        <p><strong>DPI del Vendedor:</strong> {sellerDPI}</p>
+        <p><strong>Vendedor:</strong> {sellerInfo.name}</p>
+        <p><strong>DPI del Vendedor:</strong> {sellerInfo.dpi}</p>
       </div>
 
       <form onSubmit={handleSubmit} style={styles.form}>
@@ -141,7 +272,11 @@ const Invoices = ({ sellerDPI }) => {
           {productSuggestions.length > 0 && (
             <ul style={styles.suggestionsList}>
               {productSuggestions.map((suggestion) => (
-                <li key={suggestion.id} onClick={() => selectProduct(suggestion)} style={styles.suggestionItem}>
+                <li
+                  key={suggestion.id}
+                  onClick={() => selectProduct(suggestion)}
+                  style={styles.suggestionItem}
+                >
                   {suggestion.name} - ${suggestion.price}
                 </li>
               ))}
@@ -158,7 +293,13 @@ const Invoices = ({ sellerDPI }) => {
               placeholder="Cantidad"
               style={styles.input}
             />
-            <button type="button" onClick={addProduct} style={styles.addButton}>Agregar producto</button>
+            <button
+              type="button"
+              onClick={addProduct}
+              style={styles.addButton}
+            >
+              Agregar producto
+            </button>
           </div>
         )}
 
@@ -176,11 +317,16 @@ const Invoices = ({ sellerDPI }) => {
             {formData.items.map((item, index) => (
               <tr key={index}>
                 <td>{item.name}</td>
-                <td>${item.price.toFixed(2)}</td>
+                <td>${(item.price || 0).toFixed(2)}</td>
                 <td>{item.quantity}</td>
-                <td>${item.totalPrice.toFixed(2)}</td>
+                <td>${(item.totalPrice || 0).toFixed(2)}</td>
                 <td>
-                  <button onClick={() => removeProduct(index)} style={styles.removeButton}>Eliminar</button>
+                  <button
+                    onClick={() => removeProduct(index)}
+                    style={styles.removeButton}
+                  >
+                    Eliminar
+                  </button>
                 </td>
               </tr>
             ))}
@@ -192,11 +338,29 @@ const Invoices = ({ sellerDPI }) => {
         <div style={styles.formBlock}>
           <label>Método de Pago:</label>
           <div style={styles.paymentButtons}>
-            <button onClick={() => setFormData({ ...formData, paymentMethod: 'paypal' })} style={{ ...styles.paymentButton, backgroundColor: '#007bff' }}>PayPal</button>
-            <button onClick={() => setFormData({ ...formData, paymentMethod: 'stripe' })} style={{ ...styles.paymentButton, backgroundColor: '#6f42c1' }}>Stripe</button>
-            <button onClick={() => setFormData({ ...formData, paymentMethod: 'cash' })} style={{ ...styles.paymentButton, backgroundColor: '#28a745' }}>Efectivo</button>
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, paymentMethod: 'stripe' })}
+              style={{ ...styles.paymentButton, backgroundColor: '#6f42c1' }}
+            >
+              Stripe
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, paymentMethod: 'cash' })}
+              style={{ ...styles.paymentButton, backgroundColor: '#28a745' }}
+            >
+              Efectivo
+            </button>
           </div>
         </div>
+
+        {formData.paymentMethod === 'stripe' && (
+          <div style={styles.formBlock}>
+            <label>Datos de la Tarjeta:</label>
+            <CardElement />
+          </div>
+        )}
 
         <div style={styles.formBlock}>
           <label>¿Pagado?</label>
@@ -209,7 +373,13 @@ const Invoices = ({ sellerDPI }) => {
           />
         </div>
 
-        <button type="submit" style={styles.submitButton}>Enviar factura</button>
+        <button
+          type="submit"
+          style={styles.submitButton}
+          disabled={loading}
+        >
+          {loading ? 'Procesando...' : 'Enviar factura'}
+        </button>
       </form>
     </div>
   );
@@ -220,32 +390,22 @@ const styles = {
     maxWidth: '800px',
     margin: 'auto',
     padding: '20px',
-    backgroundColor: '#f4f4f4',
-    borderRadius: '8px',
-    fontFamily: 'Arial, sans-serif',
   },
   heading: {
     textAlign: 'center',
-    color: '#333',
+  },
+  infoBox: {
+    marginBottom: '20px',
   },
   messageBox: {
-    padding: '10px',
     backgroundColor: '#f8d7da',
+    padding: '10px',
+    marginBottom: '10px',
     color: '#721c24',
-    borderRadius: '4px',
-    marginBottom: '20px',
   },
   form: {
     display: 'flex',
     flexDirection: 'column',
-  },
-  infoBox: {
-    marginBottom: '20px',
-    padding: '10px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    backgroundColor: '#f1f1f1',
-    textAlign: 'center',
   },
   formBlock: {
     marginBottom: '15px',
@@ -253,61 +413,61 @@ const styles = {
   input: {
     width: '100%',
     padding: '8px',
-    borderRadius: '4px',
+    margin: '5px 0',
+  },
+  suggestionsList: {
     border: '1px solid #ccc',
+    padding: '5px',
+    listStyleType: 'none',
+  },
+  suggestionItem: {
+    padding: '5px 10px',
+    cursor: 'pointer',
   },
   addButton: {
-    marginTop: '10px',
-    padding: '8px',
-    backgroundColor: '#28a745',
-    color: '#fff',
-    borderRadius: '4px',
+    padding: '10px',
+    backgroundColor: '#007bff',
+    color: 'white',
     border: 'none',
     cursor: 'pointer',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    marginBottom: '20px',
+  },
+  removeButton: {
+    padding: '5px 10px',
+    color: 'white',
+    backgroundColor: '#dc3545',
+    border: 'none',
+    cursor: 'pointer',
+  },
+  total: {
+    textAlign: 'right',
+    marginBottom: '20px',
   },
   paymentButtons: {
     display: 'flex',
     gap: '10px',
+    marginTop: '10px',
   },
   paymentButton: {
-    flex: 1,
-    padding: '10px 12px',
-    color: '#fff',
-    borderRadius: '4px',
-    border: 'none',
-    cursor: 'pointer',
-    transition: 'background-color 0.3s ease',
-  },
-  table: {
-    width: '100%',
-    marginTop: '20px',
-    borderCollapse: 'collapse',
-  },
-  removeButton: {
-    padding: '5px',
-    backgroundColor: '#dc3545',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  total: {
-    marginTop: '20px',
-    textAlign: 'right',
-    fontSize: '18px',
-  },
-  submitButton: {
-    marginTop: '20px',
+    color: 'white',
     padding: '10px',
-    backgroundColor: '#007bff',
-    color: '#fff',
-    borderRadius: '4px',
     border: 'none',
     cursor: 'pointer',
   },
   checkbox: {
-    width: '20px',
-    height: '20px',
+    marginLeft: '10px',
+  },
+  submitButton: {
+    padding: '10px',
+    backgroundColor: '#007bff',
+    color: 'white',
+    border: 'none',
+    cursor: 'pointer',
+    marginTop: '20px',
   },
 };
 
