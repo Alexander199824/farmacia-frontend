@@ -11,7 +11,7 @@ const Clients = () => {
     phone: '',
     address: ''
   });
-  const [image, setImage] = useState(null); // Estado para la imagen de perfil
+  const [image, setImage] = useState(null); 
   const [editing, setEditing] = useState(false);
   const [editId, setEditId] = useState(null);
   const [showModal, setShowModal] = useState(false);
