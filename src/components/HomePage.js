@@ -212,7 +212,7 @@ const HomePage = () => {
       )}
 
       <footer>
-        <p>&copy; 2024 Mi Farmacia Online. Todos los derechos reservados.</p>
+        <p>&copy; 2025 Mi Farmacia Online. Todos los derechos reservados.</p>
       </footer>
     </div>
   );
