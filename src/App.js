@@ -7,14 +7,14 @@ import HomePage from './components/HomePage';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 
-// Load your Stripe publishable key
-const stripePromise = loadStripe('pk_test_51Q9AMkB3EtWqqOZ2sr4dExyPgtFOgL7UBEAVEiuUbKdBFaNQSCivO5lTntoXL7DO6vxSjlRio5frb1MrqtztSg68007Hlq6at0');
+// Load Stripe with environment variable
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 const App = () => {
   const [isAuth, setIsAuth] = useState(false);
   const [timer, setTimer] = useState(null);
   const [logoutMessage, setLogoutMessage] = useState('');
-  const [cartItems, setCartItems] = useState([]); // Ejemplo de items en el carrito
+  const [cartItems, setCartItems] = useState([]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -40,7 +40,7 @@ const App = () => {
     const newTimer = setTimeout(() => {
       setLogoutMessage('La sesión se ha cerrado por inactividad.');
       handleLogout();
-    }, 3000000); // 30 minutos en milisegundos
+    }, parseInt(process.env.REACT_APP_SESSION_TIMEOUT) || 1800000); // 30 minutos por defecto
     setTimer(newTimer);
   };
 
@@ -58,6 +58,7 @@ const App = () => {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
+    localStorage.removeItem('dpi');
     setIsAuth(false);
     clearTimer();
   };
