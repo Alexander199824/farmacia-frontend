@@ -1,9 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import '../css/homePage.css';
 import axios from 'axios';
 import cartImage from '../imagenes/shoppingcart_77968.png';
 import CustomerModal from './CustomerModal';
-
 
 const HomePage = () => {
   const [products, setProducts] = useState([]);
@@ -23,12 +23,14 @@ const HomePage = () => {
         const response = await axios.get(`${baseURL}/products`);
         const productsWithImages = response.data.map((product) => ({
           ...product,
-          image: `data:image/jpeg;base64,${btoa(
-            new Uint8Array(product.image.data).reduce(
-              (data, byte) => data + String.fromCharCode(byte),
-              ''
-            )
-          )}`,
+          image: product.image && product.image.data 
+            ? `data:image/jpeg;base64,${btoa(
+                new Uint8Array(product.image.data).reduce(
+                  (data, byte) => data + String.fromCharCode(byte),
+                  ''
+                )
+              )}`
+            : 'https://via.placeholder.com/150x150?text=Sin+Imagen'
         }));
         setProducts(productsWithImages);
         setFilteredProducts(productsWithImages);
@@ -52,7 +54,7 @@ const HomePage = () => {
   useEffect(() => {
     localStorage.setItem('cart', JSON.stringify(cart));
     const calculatedTotal = Object.values(cart).reduce(
-      (sum, product) => sum + product.price * product.quantity, 0
+      (sum, product) => sum + (parseFloat(product.price) * product.quantity), 0
     );
     setTotalAmount(calculatedTotal);
   }, [cart]);
@@ -127,7 +129,6 @@ const HomePage = () => {
       </header>
       <nav>
         <ul>
- 
           <li><a href="/login"><i className="fas fa-user"></i> Login</a></li>
           <li className="cart-icon" onClick={() => setCartVisible(!cartVisible)}>
             <img src={cartImage} alt="Carrito de Compras" className="cart-image" />
@@ -192,7 +193,7 @@ const HomePage = () => {
                   onChange={(e) => updateCartQuantity(item.id, parseInt(e.target.value, 10))}
                   className="cart-quantity-input"
                 />
-                = Q{item.price * item.quantity}
+                = Q{parseFloat(item.price) * item.quantity}
                 <button onClick={() => removeFromCart(item.id)} className="remove-item-button">Eliminar</button>
               </li>
             ))}
@@ -207,7 +208,7 @@ const HomePage = () => {
           onClose={() => setShowCustomerModal(false)}
           cartItems={Object.values(cart)}
           totalAmount={totalAmount}
-          clearCart={clearCart} // Pasar clearCart como prop
+          clearCart={clearCart}
         />
       )}
 
