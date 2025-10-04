@@ -1,12 +1,14 @@
 /**
  * @author Alexander Echeverria
- * @file src/components/Dashboard.js (ACTUALIZADO)
- * @description Dashboard principal con todas las funcionalidades del sistema
+ * @file src/components/Dashboard.js
+ * @description Dashboard principal mejorado con todas las funcionalidades del sistema,
+ * incluyendo gestión completa para administradores y accesos específicos por rol
  * @location src/components/Dashboard.js
  */
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import Workers from './workers.js';
 import Products from './Products.js';
 import Users from './Users.js';
@@ -16,7 +18,7 @@ import Batches from './Batches.js';
 import Statistics from './Statistics.js';
 import AuditLog from './AuditLog.js';
 import Alerts from './Alerts.js';
-import HomePage from './HomePage.js';
+import Suppliers from './Suppliers.js';
 import '../css/dashboard.css';
 
 const Dashboard = ({ setAuth }) => {
@@ -25,8 +27,17 @@ const Dashboard = ({ setAuth }) => {
   const [isNavVisible, setIsNavVisible] = useState(true);
   const [content, setContent] = useState('Inicio');
   const [userName, setUserName] = useState('');
+  const [dashboardStats, setDashboardStats] = useState({
+    products: 0,
+    batches: 0,
+    invoices: 0,
+    users: 0,
+    lowStock: 0,
+    expiring: 0
+  });
+  
   const navigate = useNavigate();
-
+  const baseURL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
   const companyName = process.env.REACT_APP_COMPANY_NAME || 'Dispensario Santa Elizabeth Seton';
   const logoPath = process.env.REACT_APP_LOGO_PATH || '/images/logo.png';
 
@@ -40,17 +51,70 @@ const Dashboard = ({ setAuth }) => {
     } else {
       setRole(storedRole);
       setDpi(storedDpi);
-      fetchUserInfo();
+      fetchUserInfo(token);
+      fetchDashboardStats(token, storedRole);
     }
   }, [navigate]);
 
-  const fetchUserInfo = async () => {
+  const fetchUserInfo = async (token) => {
     try {
-      const token = localStorage.getItem('token');
-      const storedRole = localStorage.getItem('role');
-      setUserName(getRoleDisplayName(storedRole));
+      const response = await axios.get(
+        `${baseURL}/users/profile`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setUserName(response.data.name || getRoleDisplayName(localStorage.getItem('role')));
     } catch (error) {
       console.error('Error fetching user info:', error);
+      setUserName(getRoleDisplayName(localStorage.getItem('role')));
+    }
+  };
+
+  const fetchDashboardStats = async (token, userRole) => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      // Obtener productos
+      const productsRes = await axios.get(`${baseURL}/products`);
+      const products = productsRes.data;
+      const lowStock = products.filter(p => p.stock < 10).length;
+
+      let stats = {
+        products: products.length,
+        lowStock: lowStock
+      };
+
+      // Solo para administradores y vendedores
+      if (userRole === 'administrador' || userRole === 'vendedor') {
+        try {
+          // Obtener lotes
+          const batchesRes = await axios.get(`${baseURL}/batches`, { headers });
+          stats.batches = batchesRes.data.batches?.length || batchesRes.data.length || 0;
+
+          // Obtener lotes por vencer
+          const expiringRes = await axios.get(`${baseURL}/batches/expiring?days=30`, { headers });
+          stats.expiring = expiringRes.data.batches?.length || expiringRes.data.length || 0;
+
+          // Obtener facturas
+          const invoicesRes = await axios.get(`${baseURL}/invoices`, { headers });
+          stats.invoices = invoicesRes.data.length || 0;
+        } catch (error) {
+          console.error('Error fetching additional stats:', error);
+        }
+      }
+
+      // Solo para administradores
+      if (userRole === 'administrador') {
+        try {
+          const usersRes = await axios.get(`${baseURL}/users`, { headers });
+          stats.users = usersRes.data.length || 0;
+        } catch (error) {
+          console.error('Error fetching users stats:', error);
+        }
+      }
+
+      setDashboardStats(stats);
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
     }
   };
 
@@ -109,6 +173,12 @@ const Dashboard = ({ setAuth }) => {
       roles: ['administrador', 'vendedor']
     },
     {
+      id: 'Gestionar Proveedores',
+      title: 'PROVEEDORES',
+      icon: 'fas fa-truck',
+      roles: ['administrador']
+    },
+    {
       id: 'Gestionar Lotes',
       title: 'LOTES Y VENCIMIENTOS',
       icon: 'fas fa-boxes',
@@ -164,7 +234,6 @@ const Dashboard = ({ setAuth }) => {
     <div className="dashboard-container">
       {/* Navigation Sidebar */}
       <div className={`navigation ${isNavVisible ? 'visible' : 'hidden'}`}>
-        {/* Logo and Company Info */}
         <div className="nav-header">
           <div className="logo-container">
             <img src={logoPath} alt="Logo" className="nav-logo" />
@@ -175,7 +244,6 @@ const Dashboard = ({ setAuth }) => {
           </div>
         </div>
         
-        {/* Menu Items */}
         <nav className="nav-menu">
           <ul>
             {visibleMenuItems.map((item) => (
@@ -189,7 +257,6 @@ const Dashboard = ({ setAuth }) => {
           </ul>
         </nav>
         
-        {/* Logout Button */}
         <div className="nav-footer">
           <div className="user-info">
             <div className="user-avatar">
@@ -209,7 +276,6 @@ const Dashboard = ({ setAuth }) => {
 
       {/* Main Content Area */}
       <div className={`main-content ${isNavVisible ? '' : 'expanded'}`}>
-        {/* Top Bar */}
         <header className="topbar">
           <div className="topbar-left">
             <button className="nav-toggle" onClick={toggleNav}>
@@ -232,7 +298,7 @@ const Dashboard = ({ setAuth }) => {
             <div className="user-menu">
               <div className="notifications">
                 <i className="fas fa-bell"></i>
-                <span className="notification-badge">3</span>
+                <span className="notification-badge">{dashboardStats.expiring + dashboardStats.lowStock}</span>
               </div>
               
               <div className="user-profile">
@@ -246,7 +312,6 @@ const Dashboard = ({ setAuth }) => {
           </div>
         </header>
 
-        {/* Content Area */}
         <main className="content-area">
           {content === 'Inicio' && (
             <div className="welcome-section">
@@ -258,76 +323,87 @@ const Dashboard = ({ setAuth }) => {
               <div className="stats-grid">
                 {(role === 'administrador' || role === 'vendedor') && (
                   <>
-                    <div className="stat-card">
+                    <div className="stat-card" onClick={() => showContent('Gestionar Productos')}>
                       <div className="stat-icon">
                         <i className="fas fa-pills"></i>
                       </div>
                       <div className="stat-info">
                         <h3>Productos</h3>
                         <p>Gestionar inventario</p>
-                        <span className="stat-number">250+</span>
+                        <span className="stat-number">{dashboardStats.products}</span>
                       </div>
                     </div>
                     
-                    <div className="stat-card">
+                    <div className="stat-card" onClick={() => showContent('Gestionar Lotes')}>
                       <div className="stat-icon">
                         <i className="fas fa-boxes"></i>
                       </div>
                       <div className="stat-info">
                         <h3>Lotes</h3>
                         <p>Control de vencimientos</p>
-                        <span className="stat-number">89</span>
+                        <span className="stat-number">{dashboardStats.batches}</span>
                       </div>
                     </div>
                     
-                    <div className="stat-card">
+                    <div className="stat-card" onClick={() => showContent('Ver Facturas')}>
                       <div className="stat-icon">
                         <i className="fas fa-file-invoice"></i>
                       </div>
                       <div className="stat-info">
                         <h3>Facturas</h3>
-                        <p>Ventas del mes</p>
-                        <span className="stat-number">158</span>
+                        <p>Ventas registradas</p>
+                        <span className="stat-number">{dashboardStats.invoices}</span>
+                      </div>
+                    </div>
+
+                    <div className="stat-card" onClick={() => showContent('Centro de Alertas')}>
+                      <div className="stat-icon">
+                        <i className="fas fa-exclamation-triangle"></i>
+                      </div>
+                      <div className="stat-info">
+                        <h3>Alertas</h3>
+                        <p>Requieren atención</p>
+                        <span className="stat-number">{dashboardStats.lowStock + dashboardStats.expiring}</span>
                       </div>
                     </div>
                   </>
                 )}
 
                 {role === 'administrador' && (
-                  <div className="stat-card">
-                    <div className="stat-icon">
-                      <i className="fas fa-users"></i>
+                  <>
+                    <div className="stat-card" onClick={() => showContent('Gestionar Usuarios')}>
+                      <div className="stat-icon">
+                        <i className="fas fa-users"></i>
+                      </div>
+                      <div className="stat-info">
+                        <h3>Usuarios</h3>
+                        <p>Administrar accesos</p>
+                        <span className="stat-number">{dashboardStats.users}</span>
+                      </div>
                     </div>
-                    <div className="stat-info">
-                      <h3>Usuarios</h3>
-                      <p>Administrar accesos</p>
-                      <span className="stat-number">45</span>
+
+                    <div className="stat-card" onClick={() => showContent('Gestionar Proveedores')}>
+                      <div className="stat-icon">
+                        <i className="fas fa-truck"></i>
+                      </div>
+                      <div className="stat-info">
+                        <h3>Proveedores</h3>
+                        <p>Gestionar proveedores</p>
+                        <span className="stat-number">Ver</span>
+                      </div>
                     </div>
-                  </div>
-                )}
-                
-                {role === 'vendedor' && (
-                  <div className="stat-card">
-                    <div className="stat-icon">
-                      <i className="fas fa-cash-register"></i>
-                    </div>
-                    <div className="stat-info">
-                      <h3>Ventas Hoy</h3>
-                      <p>Transacciones realizadas</p>
-                      <span className="stat-number">12</span>
-                    </div>
-                  </div>
+                  </>
                 )}
                 
                 {role === 'cliente' && (
-                  <div className="stat-card">
+                  <div className="stat-card" onClick={() => navigate('/')}>
                     <div className="stat-icon">
                       <i className="fas fa-shopping-bag"></i>
                     </div>
                     <div className="stat-info">
-                      <h3>Mis Compras</h3>
-                      <p>Historial de pedidos</p>
-                      <span className="stat-number">8</span>
+                      <h3>Tienda</h3>
+                      <p>Comprar productos</p>
+                      <span className="stat-number">Ir</span>
                     </div>
                   </div>
                 )}
@@ -350,6 +426,10 @@ const Dashboard = ({ setAuth }) => {
                         <i className="fas fa-chart-bar"></i>
                         Ver Reportes
                       </button>
+                      <button className="action-btn" onClick={() => showContent('Gestionar Proveedores')}>
+                        <i className="fas fa-truck"></i>
+                        Ver Proveedores
+                      </button>
                     </>
                   )}
                   
@@ -362,6 +442,10 @@ const Dashboard = ({ setAuth }) => {
                       <button className="action-btn" onClick={() => showContent('Gestionar Lotes')}>
                         <i className="fas fa-boxes"></i>
                         Ver Lotes
+                      </button>
+                      <button className="action-btn" onClick={() => showContent('Ver Facturas')}>
+                        <i className="fas fa-file-invoice"></i>
+                        Ver Facturas
                       </button>
                     </>
                   )}
@@ -382,6 +466,7 @@ const Dashboard = ({ setAuth }) => {
           {content === 'Gestionar Lotes' && <Batches />}
           {content === 'Centro de Alertas' && <Alerts />}
           {content === 'Gestionar Usuarios' && <Users />}
+          {content === 'Gestionar Proveedores' && <Suppliers />}
           {content === 'Registrar Ventas' && <Invoices />}
           {content === 'Ver Facturas' && <Invoiceslist />}
           {content === 'Ver Estadisticas' && <Statistics />}

@@ -1,8 +1,18 @@
+/**
+ * @author Alexander Echeverria
+ * @file src/components/Products.js
+ * @description Componente mejorado para gestión completa de productos con 
+ * búsqueda avanzada, visualización de imágenes y control de inventario
+ * @location src/components/Products.js
+ */
+
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import '../css/products.css';
 
 const Products = () => {
   const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -10,22 +20,75 @@ const Products = () => {
     stock: '',
     supplier: ''
   });
-  const [image, setImage] = useState(null); // Estado para la imagen
+  const [image, setImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [editing, setEditing] = useState(false);
   const [editId, setEditId] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterBy, setFilterBy] = useState('all'); // all, low-stock, no-stock
+  const [sortBy, setSortBy] = useState('name'); // name, price, stock
+  const [viewMode, setViewMode] = useState('grid'); // grid, list
+
+  const baseURL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
 
   useEffect(() => {
     fetchProducts();
   }, []);
 
+  useEffect(() => {
+    filterAndSortProducts();
+  }, [products, searchTerm, filterBy, sortBy]);
+
   const fetchProducts = async () => {
     try {
-      const response = await axios.get('https://farmacia-backend.onrender.com/api/products');
+      const response = await axios.get(`${baseURL}/products`);
       setProducts(response.data);
     } catch (error) {
       console.error('Error al obtener productos:', error);
     }
+  };
+
+  const filterAndSortProducts = () => {
+    let filtered = [...products];
+
+    // Aplicar búsqueda
+    if (searchTerm) {
+      filtered = filtered.filter(product =>
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.supplier.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Aplicar filtros
+    switch (filterBy) {
+      case 'low-stock':
+        filtered = filtered.filter(p => p.stock < 10 && p.stock > 0);
+        break;
+      case 'no-stock':
+        filtered = filtered.filter(p => p.stock === 0);
+        break;
+      default:
+        break;
+    }
+
+    // Aplicar ordenamiento
+    switch (sortBy) {
+      case 'name':
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'price':
+        filtered.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+        break;
+      case 'stock':
+        filtered.sort((a, b) => a.stock - b.stock);
+        break;
+      default:
+        break;
+    }
+
+    setFilteredProducts(filtered);
   };
 
   const handleInputChange = (e) => {
@@ -34,7 +97,18 @@ const Products = () => {
   };
 
   const handleImageChange = (e) => {
-    setImage(e.target.files[0]); // Guardar la imagen seleccionada
+    const file = e.target.files[0];
+    setImage(file);
+    
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setImagePreview(null);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -45,39 +119,32 @@ const Products = () => {
     productData.append('price', formData.price);
     productData.append('stock', formData.stock);
     productData.append('supplier', formData.supplier);
-    if (image) productData.append('image', image); // Agregar imagen solo si está presente
+    if (image) productData.append('image', image);
 
-    const token = localStorage.getItem('token'); // Obtener el token de localStorage
+    const token = localStorage.getItem('token');
 
     try {
-      let response;
       const config = {
         headers: {
           'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}` // Incluir el token en el encabezado
+          'Authorization': `Bearer ${token}`
         }
       };
+      
       if (editing) {
-        response = await axios.put(`https://farmacia-backend.onrender.com/api/products/${editId}`, productData, config);
+        await axios.put(`${baseURL}/products/${editId}`, productData, config);
+        alert("✅ Producto actualizado exitosamente");
       } else {
-        response = await axios.post('https://farmacia-backend.onrender.com/api/products', productData, config);
+        await axios.post(`${baseURL}/products`, productData, config);
+        alert("✅ Producto creado exitosamente");
       }
-      console.log("Respuesta del servidor:", response.data);
 
       fetchProducts();
-      setFormData({
-        name: '',
-        description: '',
-        price: '',
-        stock: '',
-        supplier: '',
-      });
-      setImage(null); // Resetear la imagen
+      resetForm();
       setShowModal(false);
-      alert("Producto guardado exitosamente");
     } catch (error) {
-      console.error("Error al guardar el producto:", error.response ? error.response.data : error.message);
-      alert(`Error al guardar el producto: ${error.response ? error.response.data.message : error.message}`);
+      console.error("Error al guardar el producto:", error.response?.data || error.message);
+      alert(`❌ Error: ${error.response?.data?.message || error.message}`);
     }
   };
 
@@ -92,21 +159,36 @@ const Products = () => {
     setEditing(true);
     setEditId(product.id);
     setShowModal(true);
-  };
-
-  const deleteProduct = async (id) => {
-    const token = localStorage.getItem('token');
-    try {
-      await axios.delete(`https://farmacia-backend.onrender.com/api/products/${id}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      fetchProducts();
-    } catch (error) {
-      console.error('Error al eliminar el producto:', error);
+    
+    // Mostrar preview de imagen existente si hay
+    if (product.image && product.image.data) {
+      const base64 = btoa(
+        new Uint8Array(product.image.data).reduce(
+          (data, byte) => data + String.fromCharCode(byte),
+          ''
+        )
+      );
+      setImagePreview(`data:image/jpeg;base64,${base64}`);
     }
   };
 
-  const openModal = () => {
+  const deleteProduct = async (id) => {
+    if (!window.confirm('¿Estás seguro de eliminar este producto?')) return;
+
+    const token = localStorage.getItem('token');
+    try {
+      await axios.delete(`${baseURL}/products/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      fetchProducts();
+      alert('✅ Producto eliminado exitosamente');
+    } catch (error) {
+      console.error('Error al eliminar el producto:', error);
+      alert('❌ Error al eliminar el producto');
+    }
+  };
+
+  const resetForm = () => {
     setFormData({
       name: '',
       description: '',
@@ -115,186 +197,312 @@ const Products = () => {
       supplier: ''
     });
     setImage(null);
+    setImagePreview(null);
     setEditing(false);
+    setEditId(null);
+  };
+
+  const openModal = () => {
+    resetForm();
     setShowModal(true);
   };
 
-  const closeModal = () => {
-    setShowModal(false);
+  const getProductImage = (product) => {
+    if (product.image && product.image.data) {
+      const base64 = btoa(
+        new Uint8Array(product.image.data).reduce(
+          (data, byte) => data + String.fromCharCode(byte),
+          ''
+        )
+      );
+      return `data:image/jpeg;base64,${base64}`;
+    }
+    return 'https://via.placeholder.com/200x200?text=Sin+Imagen';
   };
 
-  return (
-    <div style={styles.productsContainer}>
-      <h2 style={styles.heading}>Gestión de Productos</h2>
-      <button onClick={openModal} style={styles.addButton}>Agregar Producto</button>
+  const getStockStatus = (stock) => {
+    if (stock === 0) return { class: 'danger', text: 'Agotado', icon: 'fa-times-circle' };
+    if (stock < 10) return { class: 'warning', text: 'Stock Bajo', icon: 'fa-exclamation-triangle' };
+    return { class: 'success', text: 'Disponible', icon: 'fa-check-circle' };
+  };
 
-      {/* Modal para Agregar y Editar Productos */}
+  const getStats = () => {
+    return {
+      total: products.length,
+      lowStock: products.filter(p => p.stock < 10 && p.stock > 0).length,
+      outOfStock: products.filter(p => p.stock === 0).length,
+      totalValue: products.reduce((sum, p) => sum + (parseFloat(p.price) * p.stock), 0)
+    };
+  };
+
+  const stats = getStats();
+
+  return (
+    <div className="products-container">
+      <div className="products-header">
+        <div>
+          <h2>Gestión de Productos</h2>
+          <p>Administración completa del inventario</p>
+        </div>
+        <button onClick={openModal} className="btn-add">
+          <i className="fas fa-plus"></i> Agregar Producto
+        </button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="stats-grid">
+        <div className="stat-card blue">
+          <div className="stat-icon">
+            <i className="fas fa-boxes"></i>
+          </div>
+          <div className="stat-info">
+            <h4>Total Productos</h4>
+            <p className="stat-number">{stats.total}</p>
+          </div>
+        </div>
+
+        <div className="stat-card orange">
+          <div className="stat-icon">
+            <i className="fas fa-exclamation-triangle"></i>
+          </div>
+          <div className="stat-info">
+            <h4>Stock Bajo</h4>
+            <p className="stat-number">{stats.lowStock}</p>
+          </div>
+        </div>
+
+        <div className="stat-card red">
+          <div className="stat-icon">
+            <i className="fas fa-times-circle"></i>
+          </div>
+          <div className="stat-info">
+            <h4>Agotados</h4>
+            <p className="stat-number">{stats.outOfStock}</p>
+          </div>
+        </div>
+
+        <div className="stat-card green">
+          <div className="stat-icon">
+            <i className="fas fa-dollar-sign"></i>
+          </div>
+          <div className="stat-info">
+            <h4>Valor Total</h4>
+            <p className="stat-number">Q{stats.totalValue.toFixed(2)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div className="controls-section">
+        <div className="search-box">
+          <i className="fas fa-search"></i>
+          <input
+            type="text"
+            placeholder="Buscar productos..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <div className="filter-controls">
+          <select value={filterBy} onChange={(e) => setFilterBy(e.target.value)}>
+            <option value="all">Todos</option>
+            <option value="low-stock">Stock Bajo</option>
+            <option value="no-stock">Agotados</option>
+          </select>
+
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="name">Ordenar: Nombre</option>
+            <option value="price">Ordenar: Precio</option>
+            <option value="stock">Ordenar: Stock</option>
+          </select>
+
+          <div className="view-toggle">
+            <button 
+              className={viewMode === 'grid' ? 'active' : ''}
+              onClick={() => setViewMode('grid')}
+            >
+              <i className="fas fa-th"></i>
+            </button>
+            <button 
+              className={viewMode === 'list' ? 'active' : ''}
+              onClick={() => setViewMode('list')}
+            >
+              <i className="fas fa-list"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal */}
       {showModal && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <h3 style={styles.formTitle}>{editing ? "Actualizar Producto" : "Agregar Producto"}</h3>
-            <form onSubmit={handleSubmit} style={styles.productForm} encType="multipart/form-data">
-              <input type="text" name="name" value={formData.name} onChange={handleInputChange} placeholder="Nombre" required style={styles.input} />
-              <input type="text" name="description" value={formData.description} onChange={handleInputChange} placeholder="Descripción" style={styles.input} />
-              <input type="number" name="price" value={formData.price} onChange={handleInputChange} placeholder="Precio" required style={styles.input} />
-              <input type="number" name="stock" value={formData.stock} onChange={handleInputChange} placeholder="Stock" required style={styles.input} />
-              <input type="text" name="supplier" value={formData.supplier} onChange={handleInputChange} placeholder="Proveedor" required style={styles.input} />
-              <input type="file" name="image" onChange={handleImageChange} style={styles.input} /> {/* Campo para imagen */}
-              <button type="submit" style={styles.submitButton}>{editing ? "Actualizar" : "Agregar"}</button>
-              <button onClick={closeModal} type="button" style={styles.cancelButton}>Cancelar</button>
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>{editing ? 'Actualizar Producto' : 'Nuevo Producto'}</h3>
+              <button onClick={() => setShowModal(false)} className="close-btn">
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="product-form">
+              <div className="form-grid">
+                <div className="form-group full-width">
+                  <label>Nombre del Producto *</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="Ej: Paracetamol 500mg"
+                    required
+                  />
+                </div>
+
+                <div className="form-group full-width">
+                  <label>Descripción</label>
+                  <textarea
+                    name="description"
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    placeholder="Descripción del producto"
+                    rows="3"
+                  ></textarea>
+                </div>
+
+                <div className="form-group">
+                  <label>Precio (Q) *</label>
+                  <input
+                    type="number"
+                    name="price"
+                    value={formData.price}
+                    onChange={handleInputChange}
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Stock Inicial *</label>
+                  <input
+                    type="number"
+                    name="stock"
+                    value={formData.stock}
+                    onChange={handleInputChange}
+                    placeholder="0"
+                    min="0"
+                    required
+                  />
+                </div>
+
+                <div className="form-group full-width">
+                  <label>Proveedor *</label>
+                  <input
+                    type="text"
+                    name="supplier"
+                    value={formData.supplier}
+                    onChange={handleInputChange}
+                    placeholder="Nombre del proveedor"
+                    required
+                  />
+                </div>
+
+                <div className="form-group full-width">
+                  <label>Imagen del Producto</label>
+                  <div className="image-upload-area">
+                    {imagePreview && (
+                      <div className="image-preview">
+                        <img src={imagePreview} alt="Preview" />
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      id="product-image"
+                      className="file-input"
+                    />
+                    <label htmlFor="product-image" className="file-label">
+                      <i className="fas fa-camera"></i>
+                      {imagePreview ? 'Cambiar Imagen' : 'Seleccionar Imagen'}
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button type="button" onClick={() => setShowModal(false)} className="btn-cancel">
+                  Cancelar
+                </button>
+                <button type="submit" className="btn-submit">
+                  {editing ? 'Actualizar' : 'Crear'} Producto
+                </button>
+              </div>
             </form>
           </div>
         </div>
       )}
 
-      <table style={styles.productsTable}>
-        <thead>
-          <tr>
-            <th style={styles.tableHeader}>Nombre</th>
-            <th style={styles.tableHeader}>Descripción</th>
-            <th style={styles.tableHeader}>Precio</th>
-            <th style={styles.tableHeader}>Stock</th>
-            <th style={styles.tableHeader}>Proveedor</th>
-            <th style={styles.tableHeader}>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {products.length > 0 ? (
-            products.map(product => (
-              <tr key={product.id}>
-                <td style={styles.tableData}>{product.name}</td>
-                <td style={styles.tableData}>{product.description}</td>
-                <td style={styles.tableData}>{product.price}</td>
-                <td style={styles.tableData}>{product.stock}</td>
-                <td style={styles.tableData}>{product.supplier}</td>
-                <td style={styles.tableData}>
-                  <button onClick={() => editProduct(product)} style={styles.editButton}>Editar</button>
-                  <button onClick={() => deleteProduct(product.id)} style={styles.deleteButton}>Eliminar</button>
-                </td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan="6" style={styles.noProducts}>No hay productos disponibles.</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      {/* Products Display */}
+      <div className={`products-display ${viewMode}`}>
+        {filteredProducts.length === 0 ? (
+          <div className="no-products">
+            <i className="fas fa-box-open"></i>
+            <h3>No se encontraron productos</h3>
+            <p>Intenta cambiar los filtros de búsqueda</p>
+          </div>
+        ) : (
+          filteredProducts.map(product => {
+            const status = getStockStatus(product.stock);
+            return (
+              <div key={product.id} className="product-card">
+                <div className="product-image">
+                  <img src={getProductImage(product)} alt={product.name} />
+                  <div className={`stock-badge ${status.class}`}>
+                    <i className={`fas ${status.icon}`}></i>
+                    {status.text}
+                  </div>
+                </div>
+                
+                <div className="product-info">
+                  <h4>{product.name}</h4>
+                  <p className="product-description">{product.description}</p>
+                  
+                  <div className="product-details">
+                    <div className="detail-item">
+                      <i className="fas fa-tag"></i>
+                      <span>Q{parseFloat(product.price).toFixed(2)}</span>
+                    </div>
+                    <div className="detail-item">
+                      <i className="fas fa-boxes"></i>
+                      <span>{product.stock} unidades</span>
+                    </div>
+                    <div className="detail-item">
+                      <i className="fas fa-truck"></i>
+                      <span>{product.supplier}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="product-actions">
+                  <button onClick={() => editProduct(product)} className="btn-edit">
+                    <i className="fas fa-edit"></i>
+                    Editar
+                  </button>
+                  <button onClick={() => deleteProduct(product.id)} className="btn-delete">
+                    <i className="fas fa-trash"></i>
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
-};
-
-const styles = {
-  productsContainer: {
-    width: '100%',
-    padding: '20px',
-    backgroundColor: '#f9f9f9',
-    borderRadius: '8px',
-    fontFamily: 'Arial, sans-serif',
-  },
-  heading: {
-    textAlign: 'center',
-    color: '#333',
-  },
-  addButton: {
-    marginBottom: '20px',
-    padding: '10px 15px',
-    backgroundColor: '#007BFF',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: '16px',
-    cursor: 'pointer',
-  },
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    padding: '20px',
-    borderRadius: '8px',
-    width: '500px',
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
-  },
-  productForm: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  formTitle: {
-    marginBottom: '15px',
-    color: '#333',
-  },
-  input: {
-    marginBottom: '10px',
-    padding: '10px',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    fontSize: '14px',
-  },
-  submitButton: {
-    padding: '10px',
-    backgroundColor: '#4CAF50',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: '16px',
-    cursor: 'pointer',
-    marginBottom: '10px',
-  },
-  cancelButton: {
-    padding: '10px',
-    backgroundColor: '#dc3545',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: '16px',
-    cursor: 'pointer',
-  },
-  productsTable: {
-    width: '100%',
-    borderCollapse: 'collapse',
-  },
-  tableHeader: {
-    padding: '12px',
-    backgroundColor: '#007BFF',
-    color: '#fff',
-  },
-  tableData: {
-    padding: '12px',
-    border: '1px solid #ddd',
-    textAlign: 'center',
-  },
-  editButton: {
-    padding: '5px 10px',
-    backgroundColor: '#ffc107',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  deleteButton: {
-    padding: '5px 10px',
-    backgroundColor: '#dc3545',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    marginLeft: '5px',
-  },
-  noProducts: {
-    textAlign: 'center',
-    color: '#999',
-    padding: '20px',
-  },
 };
 
 export default Products;
