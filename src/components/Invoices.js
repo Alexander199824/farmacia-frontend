@@ -3,9 +3,12 @@ import axios from 'axios';
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 
 const Invoices = () => {
+  const baseURL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
+  
   const [formData, setFormData] = useState({
     clientDPI: '',
     clientName: '',
+    clientId: null,
     paymentMethod: '',
     paid: false,
     items: [],
@@ -42,7 +45,7 @@ const Invoices = () => {
       }
 
       const response = await axios.get(
-        'https://farmacia-backend.onrender.com/api/users/profile',
+        `${baseURL}/users/profile`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -60,8 +63,12 @@ const Invoices = () => {
 
   const fetchClientName = async (dpi) => {
     try {
-      const response = await axios.get(`https://farmacia-backend.onrender.com/api/clients/by-dpi/${dpi}`);
-      setFormData((prevData) => ({ ...prevData, clientName: response.data.name }));
+      const response = await axios.get(`${baseURL}/clients/by-dpi/${dpi}`);
+      setFormData((prevData) => ({ 
+        ...prevData, 
+        clientName: response.data.name,
+        clientId: response.data.id
+      }));
     } catch (error) {
       setMessage('Cliente no encontrado o error en la conexión.');
     }
@@ -69,7 +76,7 @@ const Invoices = () => {
 
   const fetchProductSuggestions = async (search) => {
     try {
-      const response = await axios.get(`https://farmacia-backend.onrender.com/api/products?search=${search}`);
+      const response = await axios.get(`${baseURL}/products?search=${search}`);
       setProductSuggestions(response.data);
     } catch (error) {
       setMessage('Error al obtener productos.');
@@ -128,12 +135,18 @@ const Invoices = () => {
     const token = localStorage.getItem('token');
     try {
       await axios.post(
-        'https://farmacia-backend.onrender.com/api/invoices',
+        `${baseURL}/invoices/create`,
         {
-          ...formData,
+          clientId: formData.clientId,
           sellerDPI: sellerInfo.dpi,
-          paymentIntentId,
-          total: total
+          clientDPI: formData.clientDPI,
+          paymentMethod: formData.paymentMethod,
+          items: formData.items.map(item => ({
+            productId: item.id,
+            quantity: item.quantity,
+            unitPrice: parseFloat(item.price).toFixed(2),
+          })),
+          ...(paymentIntentId && { paymentIntentId }),
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -143,6 +156,7 @@ const Invoices = () => {
       setFormData({
         clientDPI: '',
         clientName: '',
+        clientId: null,
         paymentMethod: '',
         paid: false,
         items: [],
@@ -163,17 +177,18 @@ const Invoices = () => {
     const token = localStorage.getItem('token');
 
     try {
-      // Create payment intent
       const paymentIntentResponse = await axios.post(
-        'https://farmacia-backend.onrender.com/api/payments/create-payment-intent',
+        `${baseURL}/payments/create-payment-intent`,
         {
           amount: Math.round(total * 100),
+          clientId: formData.clientId,
+          sellerDPI: sellerInfo.dpi,
           clientDPI: formData.clientDPI,
           paymentMethod: 'stripe',
           items: formData.items.map(item => ({
             productId: item.id,
             quantity: item.quantity,
-            unitPrice: item.price,
+            unitPrice: parseFloat(item.price).toFixed(2),
           })),
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -181,7 +196,6 @@ const Invoices = () => {
 
       const { clientSecret } = paymentIntentResponse.data;
 
-      // Confirm card payment
       const card = elements.getElement(CardElement);
       const result = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {

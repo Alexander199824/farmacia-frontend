@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const InvoiceList = () => {
+  const baseURL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -9,7 +10,7 @@ const InvoiceList = () => {
   useEffect(() => {
     const fetchInvoices = async () => {
       try {
-        const response = await axios.get('https://farmacia-backend.onrender.com/api/invoices', {
+        const response = await axios.get(`${baseURL}/invoices`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -24,7 +25,7 @@ const InvoiceList = () => {
     };
 
     fetchInvoices();
-  }, []);
+  }, [baseURL]);
 
   if (loading) return <p>Cargando facturas...</p>;
   if (error) return <p>Error al cargar las facturas: {error.message}</p>;
@@ -55,7 +56,7 @@ const InvoiceList = () => {
                 <td style={styles.tableData}>{invoice.clientId}</td>
                 <td style={styles.tableData}>{invoice.sellerDPI}</td>
                 <td style={styles.tableData}>{invoice.clientDPI}</td>
-                <td style={styles.tableData}>Q{Number(invoice.totalAmount).toFixed(2)}</td> {/* Asegura que totalAmount sea un número */}
+                <td style={styles.tableData}>Q{Number(invoice.totalAmount).toFixed(2)}</td>
                 <td style={styles.tableData}>{invoice.paymentMethod}</td>
                 <td style={styles.tableData}>{new Date(invoice.date).toLocaleDateString()}</td>
                 <td style={styles.tableData}>
