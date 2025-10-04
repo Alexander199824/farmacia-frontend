@@ -1,3 +1,10 @@
+/**
+ * @author Alexander Echeverria
+ * @file src/components/Dashboard.js (ACTUALIZADO)
+ * @description Dashboard principal con todas las funcionalidades del sistema
+ * @location src/components/Dashboard.js
+ */
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Workers from './workers.js';
@@ -5,6 +12,10 @@ import Products from './Products.js';
 import Users from './Users.js';
 import Invoices from './Invoices.js';
 import Invoiceslist from './InvoiceList.js';
+import Batches from './Batches.js';
+import Statistics from './Statistics.js';
+import AuditLog from './AuditLog.js';
+import Alerts from './Alerts.js';
 import HomePage from './HomePage.js';
 import '../css/dashboard.css';
 
@@ -29,8 +40,6 @@ const Dashboard = ({ setAuth }) => {
     } else {
       setRole(storedRole);
       setDpi(storedDpi);
-      
-      // Obtener información del usuario
       fetchUserInfo();
     }
   }, [navigate]);
@@ -38,9 +47,8 @@ const Dashboard = ({ setAuth }) => {
   const fetchUserInfo = async () => {
     try {
       const token = localStorage.getItem('token');
-      // Aquí podrías hacer una llamada a la API para obtener más información del usuario
-      // Por ahora, usaremos el rol para mostrar información
-      setUserName(role === 'administrador' ? 'Administrador' : role === 'vendedor' ? 'Vendedor' : 'Cliente');
+      const storedRole = localStorage.getItem('role');
+      setUserName(getRoleDisplayName(storedRole));
     } catch (error) {
       console.error('Error fetching user info:', error);
     }
@@ -53,8 +61,6 @@ const Dashboard = ({ setAuth }) => {
     
     if (typeof setAuth === 'function') {
       setAuth(false);
-    } else {
-      console.error("setAuth is not defined as a function.");
     }
     navigate('/');
   };
@@ -91,9 +97,21 @@ const Dashboard = ({ setAuth }) => {
       roles: ['administrador', 'vendedor', 'cliente']
     },
     {
+      id: 'Centro de Alertas',
+      title: 'ALERTAS',
+      icon: 'fas fa-bell',
+      roles: ['administrador', 'vendedor']
+    },
+    {
       id: 'Gestionar Productos',
       title: 'PRODUCTOS',
       icon: 'fas fa-pills',
+      roles: ['administrador', 'vendedor']
+    },
+    {
+      id: 'Gestionar Lotes',
+      title: 'LOTES Y VENCIMIENTOS',
+      icon: 'fas fa-boxes',
       roles: ['administrador', 'vendedor']
     },
     {
@@ -118,12 +136,18 @@ const Dashboard = ({ setAuth }) => {
       id: 'Ver Facturas',
       title: 'FACTURAS',
       icon: 'fas fa-file-invoice',
+      roles: ['administrador', 'vendedor']
+    },
+    {
+      id: 'Ver Estadisticas',
+      title: 'ESTADÍSTICAS Y REPORTES',
+      icon: 'fas fa-chart-bar',
       roles: ['administrador']
     },
     {
-      id: 'Ver Reportes',
-      title: 'REPORTES',
-      icon: 'fas fa-chart-bar',
+      id: 'Auditoria Sistema',
+      title: 'AUDITORÍA',
+      icon: 'fas fa-clipboard-list',
       roles: ['administrador']
     },
     {
@@ -232,7 +256,7 @@ const Dashboard = ({ setAuth }) => {
               </div>
               
               <div className="stats-grid">
-                {role === 'administrador' && (
+                {(role === 'administrador' || role === 'vendedor') && (
                   <>
                     <div className="stat-card">
                       <div className="stat-icon">
@@ -247,12 +271,12 @@ const Dashboard = ({ setAuth }) => {
                     
                     <div className="stat-card">
                       <div className="stat-icon">
-                        <i className="fas fa-users"></i>
+                        <i className="fas fa-boxes"></i>
                       </div>
                       <div className="stat-info">
-                        <h3>Usuarios</h3>
-                        <p>Administrar accesos</p>
-                        <span className="stat-number">45</span>
+                        <h3>Lotes</h3>
+                        <p>Control de vencimientos</p>
+                        <span className="stat-number">89</span>
                       </div>
                     </div>
                     
@@ -268,31 +292,31 @@ const Dashboard = ({ setAuth }) => {
                     </div>
                   </>
                 )}
+
+                {role === 'administrador' && (
+                  <div className="stat-card">
+                    <div className="stat-icon">
+                      <i className="fas fa-users"></i>
+                    </div>
+                    <div className="stat-info">
+                      <h3>Usuarios</h3>
+                      <p>Administrar accesos</p>
+                      <span className="stat-number">45</span>
+                    </div>
+                  </div>
+                )}
                 
                 {role === 'vendedor' && (
-                  <>
-                    <div className="stat-card">
-                      <div className="stat-icon">
-                        <i className="fas fa-cash-register"></i>
-                      </div>
-                      <div className="stat-info">
-                        <h3>Ventas Hoy</h3>
-                        <p>Transacciones realizadas</p>
-                        <span className="stat-number">12</span>
-                      </div>
+                  <div className="stat-card">
+                    <div className="stat-icon">
+                      <i className="fas fa-cash-register"></i>
                     </div>
-                    
-                    <div className="stat-card">
-                      <div className="stat-icon">
-                        <i className="fas fa-pills"></i>
-                      </div>
-                      <div className="stat-info">
-                        <h3>Productos</h3>
-                        <p>Disponibles para venta</p>
-                        <span className="stat-number">250+</span>
-                      </div>
+                    <div className="stat-info">
+                      <h3>Ventas Hoy</h3>
+                      <p>Transacciones realizadas</p>
+                      <span className="stat-number">12</span>
                     </div>
-                  </>
+                  </div>
                 )}
                 
                 {role === 'cliente' && (
@@ -318,18 +342,28 @@ const Dashboard = ({ setAuth }) => {
                         <i className="fas fa-plus"></i>
                         Agregar Producto
                       </button>
-                      <button className="action-btn" onClick={() => showContent('Ver Facturas')}>
-                        <i className="fas fa-file-invoice"></i>
-                        Ver Facturas
+                      <button className="action-btn" onClick={() => showContent('Gestionar Lotes')}>
+                        <i className="fas fa-boxes"></i>
+                        Nuevo Lote
+                      </button>
+                      <button className="action-btn" onClick={() => showContent('Ver Estadisticas')}>
+                        <i className="fas fa-chart-bar"></i>
+                        Ver Reportes
                       </button>
                     </>
                   )}
                   
                   {role === 'vendedor' && (
-                    <button className="action-btn" onClick={() => showContent('Registrar Ventas')}>
-                      <i className="fas fa-cash-register"></i>
-                      Nueva Venta
-                    </button>
+                    <>
+                      <button className="action-btn" onClick={() => showContent('Registrar Ventas')}>
+                        <i className="fas fa-cash-register"></i>
+                        Nueva Venta
+                      </button>
+                      <button className="action-btn" onClick={() => showContent('Gestionar Lotes')}>
+                        <i className="fas fa-boxes"></i>
+                        Ver Lotes
+                      </button>
+                    </>
                   )}
                   
                   {role === 'cliente' && (
@@ -345,15 +379,13 @@ const Dashboard = ({ setAuth }) => {
           
           {content === 'Gestionar Trabajadores' && <Workers />}
           {content === 'Gestionar Productos' && <Products />}
+          {content === 'Gestionar Lotes' && <Batches />}
+          {content === 'Centro de Alertas' && <Alerts />}
           {content === 'Gestionar Usuarios' && <Users />}
           {content === 'Registrar Ventas' && <Invoices />}
           {content === 'Ver Facturas' && <Invoiceslist />}
-          {content === 'Ver Reportes' && (
-            <div className="reports-section">
-              <h2>Reportes y Análisis</h2>
-              <p>Esta sección estará disponible próximamente con gráficos y estadísticas detalladas.</p>
-            </div>
-          )}
+          {content === 'Ver Estadisticas' && <Statistics />}
+          {content === 'Auditoria Sistema' && <AuditLog />}
           {content === 'Mis Compras' && (
             <div className="purchases-section">
               <h2>Mis Compras</h2>
