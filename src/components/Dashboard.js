@@ -1,8 +1,7 @@
 /**
  * @author Alexander Echeverria
  * @file src/components/Dashboard.js
- * @description Dashboard principal mejorado con todas las funcionalidades del sistema,
- * incluyendo gestión completa para administradores y accesos específicos por rol
+ * @description Dashboard principal mejorado con visualización correcta de estadísticas
  * @location src/components/Dashboard.js
  */
 
@@ -30,10 +29,12 @@ const Dashboard = ({ setAuth }) => {
   const [dashboardStats, setDashboardStats] = useState({
     products: 0,
     batches: 0,
-    invoices: 0,
+    orders: 0,
     users: 0,
+    workers: 0,
     lowStock: 0,
-    expiring: 0
+    expiring: 0,
+    totalRevenue: 0
   });
   
   const navigate = useNavigate();
@@ -80,10 +81,16 @@ const Dashboard = ({ setAuth }) => {
 
       let stats = {
         products: products.length,
-        lowStock: lowStock
+        lowStock: lowStock,
+        batches: 0,
+        orders: 0,
+        users: 0,
+        workers: 0,
+        expiring: 0,
+        totalRevenue: 0
       };
 
-      // Solo para administradores y vendedores
+      // Para administradores y vendedores
       if (userRole === 'administrador' || userRole === 'vendedor') {
         try {
           // Obtener lotes
@@ -94,9 +101,13 @@ const Dashboard = ({ setAuth }) => {
           const expiringRes = await axios.get(`${baseURL}/batches/expiring?days=30`, { headers });
           stats.expiring = expiringRes.data.batches?.length || expiringRes.data.length || 0;
 
-          // Obtener facturas
-          const invoicesRes = await axios.get(`${baseURL}/invoices`, { headers });
-          stats.invoices = invoicesRes.data.length || 0;
+          // Obtener recibos/pedidos
+          const ordersRes = await axios.get(`${baseURL}/invoices`, { headers });
+          const orders = ordersRes.data || [];
+          stats.orders = orders.length;
+          
+          // Calcular ingresos totales
+          stats.totalRevenue = orders.reduce((sum, order) => sum + parseFloat(order.totalAmount || 0), 0);
         } catch (error) {
           console.error('Error fetching additional stats:', error);
         }
@@ -105,10 +116,15 @@ const Dashboard = ({ setAuth }) => {
       // Solo para administradores
       if (userRole === 'administrador') {
         try {
+          // Obtener usuarios
           const usersRes = await axios.get(`${baseURL}/users`, { headers });
           stats.users = usersRes.data.length || 0;
+
+          // Obtener trabajadores
+          const workersRes = await axios.get(`${baseURL}/workers`, { headers });
+          stats.workers = workersRes.data.length || 0;
         } catch (error) {
-          console.error('Error fetching users stats:', error);
+          console.error('Error fetching users/workers stats:', error);
         }
       }
 
@@ -180,13 +196,13 @@ const Dashboard = ({ setAuth }) => {
     },
     {
       id: 'Gestionar Lotes',
-      title: 'LOTES Y VENCIMIENTOS',
+      title: 'LOTES',
       icon: 'fas fa-boxes',
       roles: ['administrador', 'vendedor']
     },
     {
       id: 'Registrar Ventas',
-      title: 'REGISTRAR VENTAS',
+      title: 'VENTAS',
       icon: 'fas fa-cash-register',
       roles: ['administrador', 'vendedor']
     },
@@ -203,14 +219,14 @@ const Dashboard = ({ setAuth }) => {
       roles: ['administrador']
     },
     {
-      id: 'Ver Facturas',
-      title: 'FACTURAS',
+      id: 'Ver Pedidos',
+      title: 'PEDIDOS',
       icon: 'fas fa-file-invoice',
       roles: ['administrador', 'vendedor']
     },
     {
       id: 'Ver Estadisticas',
-      title: 'ESTADÍSTICAS Y REPORTES',
+      title: 'REPORTES',
       icon: 'fas fa-chart-bar',
       roles: ['administrador']
     },
@@ -280,7 +296,7 @@ const Dashboard = ({ setAuth }) => {
           <div className="topbar-left">
             <button className="nav-toggle" onClick={toggleNav}>
               <i className={`fas ${isNavVisible ? 'fa-times' : 'fa-bars'}`}></i>
-              <span>{isNavVisible ? 'Cerrar Menú' : 'Abrir Menú'}</span>
+              <span>{isNavVisible ? 'Cerrar' : 'Menú'}</span>
             </button>
             <div className="breadcrumb">
               <span>Dashboard</span>
@@ -321,19 +337,45 @@ const Dashboard = ({ setAuth }) => {
               </div>
               
               <div className="stats-grid">
-                {(role === 'administrador' || role === 'vendedor') && (
+                <div className="stat-card" onClick={() => showContent('Gestionar Productos')}>
+                  <div className="stat-icon">
+                    <i className="fas fa-pills"></i>
+                  </div>
+                  <div className="stat-info">
+                    <h3>Productos</h3>
+                    <p>Total en inventario</p>
+                    <span className="stat-number">{dashboardStats.products}</span>
+                  </div>
+                </div>
+
+                {role === 'administrador' && (
                   <>
-                    <div className="stat-card" onClick={() => showContent('Gestionar Productos')}>
+                    <div className="stat-card" onClick={() => showContent('Gestionar Usuarios')}>
                       <div className="stat-icon">
-                        <i className="fas fa-pills"></i>
+                        <i className="fas fa-users"></i>
                       </div>
                       <div className="stat-info">
-                        <h3>Productos</h3>
-                        <p>Gestionar inventario</p>
-                        <span className="stat-number">{dashboardStats.products}</span>
+                        <h3>Usuarios</h3>
+                        <p>Registrados en sistema</p>
+                        <span className="stat-number">{dashboardStats.users}</span>
                       </div>
                     </div>
-                    
+
+                    <div className="stat-card" onClick={() => showContent('Gestionar Trabajadores')}>
+                      <div className="stat-icon">
+                        <i className="fas fa-user-tie"></i>
+                      </div>
+                      <div className="stat-info">
+                        <h3>Trabajadores</h3>
+                        <p>Personal activo</p>
+                        <span className="stat-number">{dashboardStats.workers}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {(role === 'administrador' || role === 'vendedor') && (
+                  <>
                     <div className="stat-card" onClick={() => showContent('Gestionar Lotes')}>
                       <div className="stat-icon">
                         <i className="fas fa-boxes"></i>
@@ -345,18 +387,29 @@ const Dashboard = ({ setAuth }) => {
                       </div>
                     </div>
                     
-                    <div className="stat-card" onClick={() => showContent('Ver Facturas')}>
+                    <div className="stat-card" onClick={() => showContent('Ver Pedidos')}>
                       <div className="stat-icon">
                         <i className="fas fa-file-invoice"></i>
                       </div>
                       <div className="stat-info">
-                        <h3>Facturas</h3>
-                        <p>Ventas registradas</p>
-                        <span className="stat-number">{dashboardStats.invoices}</span>
+                        <h3>Pedidos</h3>
+                        <p>Total registrados</p>
+                        <span className="stat-number">{dashboardStats.orders}</span>
                       </div>
                     </div>
 
-                    <div className="stat-card" onClick={() => showContent('Centro de Alertas')}>
+                    <div className="stat-card">
+                      <div className="stat-icon">
+                        <i className="fas fa-dollar-sign"></i>
+                      </div>
+                      <div className="stat-info">
+                        <h3>Ingresos</h3>
+                        <p>Total acumulado</p>
+                        <span className="stat-number">Q{dashboardStats.totalRevenue.toFixed(2)}</span>
+                      </div>
+                    </div>
+
+                    <div className="stat-card alert-card" onClick={() => showContent('Centro de Alertas')}>
                       <div className="stat-icon">
                         <i className="fas fa-exclamation-triangle"></i>
                       </div>
@@ -364,32 +417,6 @@ const Dashboard = ({ setAuth }) => {
                         <h3>Alertas</h3>
                         <p>Requieren atención</p>
                         <span className="stat-number">{dashboardStats.lowStock + dashboardStats.expiring}</span>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {role === 'administrador' && (
-                  <>
-                    <div className="stat-card" onClick={() => showContent('Gestionar Usuarios')}>
-                      <div className="stat-icon">
-                        <i className="fas fa-users"></i>
-                      </div>
-                      <div className="stat-info">
-                        <h3>Usuarios</h3>
-                        <p>Administrar accesos</p>
-                        <span className="stat-number">{dashboardStats.users}</span>
-                      </div>
-                    </div>
-
-                    <div className="stat-card" onClick={() => showContent('Gestionar Proveedores')}>
-                      <div className="stat-icon">
-                        <i className="fas fa-truck"></i>
-                      </div>
-                      <div className="stat-info">
-                        <h3>Proveedores</h3>
-                        <p>Gestionar proveedores</p>
-                        <span className="stat-number">Ver</span>
                       </div>
                     </div>
                   </>
@@ -426,9 +453,9 @@ const Dashboard = ({ setAuth }) => {
                         <i className="fas fa-chart-bar"></i>
                         Ver Reportes
                       </button>
-                      <button className="action-btn" onClick={() => showContent('Gestionar Proveedores')}>
-                        <i className="fas fa-truck"></i>
-                        Ver Proveedores
+                      <button className="action-btn" onClick={() => showContent('Gestionar Usuarios')}>
+                        <i className="fas fa-user-plus"></i>
+                        Agregar Usuario
                       </button>
                     </>
                   )}
@@ -439,13 +466,13 @@ const Dashboard = ({ setAuth }) => {
                         <i className="fas fa-cash-register"></i>
                         Nueva Venta
                       </button>
-                      <button className="action-btn" onClick={() => showContent('Gestionar Lotes')}>
-                        <i className="fas fa-boxes"></i>
-                        Ver Lotes
-                      </button>
-                      <button className="action-btn" onClick={() => showContent('Ver Facturas')}>
+                      <button className="action-btn" onClick={() => showContent('Ver Pedidos')}>
                         <i className="fas fa-file-invoice"></i>
-                        Ver Facturas
+                        Ver Pedidos
+                      </button>
+                      <button className="action-btn" onClick={() => showContent('Centro de Alertas')}>
+                        <i className="fas fa-bell"></i>
+                        Ver Alertas
                       </button>
                     </>
                   )}
@@ -468,7 +495,7 @@ const Dashboard = ({ setAuth }) => {
           {content === 'Gestionar Usuarios' && <Users />}
           {content === 'Gestionar Proveedores' && <Suppliers />}
           {content === 'Registrar Ventas' && <Invoices />}
-          {content === 'Ver Facturas' && <Invoiceslist />}
+          {content === 'Ver Pedidos' && <Invoiceslist />}
           {content === 'Ver Estadisticas' && <Statistics />}
           {content === 'Auditoria Sistema' && <AuditLog />}
           {content === 'Mis Compras' && (

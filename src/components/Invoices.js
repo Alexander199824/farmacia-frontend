@@ -1,8 +1,7 @@
 /**
  * @author Alexander Echeverria
  * @file src/components/Invoices.js
- * @description Componente mejorado para registrar ventas con búsqueda de productos, 
- * validación de stock y gestión completa del carrito de compras
+ * @description Componente mejorado para registrar ventas y pedidos
  * @location src/components/Invoices.js
  */
 
@@ -251,7 +250,7 @@ const Invoices = () => {
     }
   };
 
-  const createInvoice = async (paymentIntentId = null) => {
+  const createOrder = async (paymentIntentId = null) => {
     const token = localStorage.getItem('token');
     try {
       await axios.post(
@@ -271,7 +270,7 @@ const Invoices = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
-      setMessage('✅ Factura creada exitosamente.');
+      setMessage('✅ Pedido registrado exitosamente.');
       
       // Resetear formulario
       setFormData({
@@ -283,10 +282,10 @@ const Invoices = () => {
       });
       setTotal(0);
       
-      // Recargar productos para actualizar stock
+      // Recargar productos
       fetchAllProducts();
     } catch (error) {
-      throw new Error(`Error al guardar la factura: ${error.response?.data?.message || error.message}`);
+      throw new Error(`Error al guardar el pedido: ${error.response?.data?.message || error.message}`);
     }
   };
 
@@ -307,10 +306,10 @@ const Invoices = () => {
       if (formData.paymentMethod === 'stripe') {
         const paymentIntentId = await handleStripePayment();
         if (paymentIntentId) {
-          await createInvoice(paymentIntentId);
+          await createOrder(paymentIntentId);
         }
       } else {
-        await createInvoice();
+        await createOrder();
       }
     } catch (error) {
       setMessage(`❌ ${error.message}`);
@@ -324,7 +323,7 @@ const Invoices = () => {
       <div className="invoices-header">
         <div>
           <h2>Registrar Nueva Venta</h2>
-          <p>Complete los datos del cliente y agregue productos al carrito</p>
+          <p>Complete los datos del cliente y agregue productos al pedido</p>
         </div>
       </div>
 
@@ -567,7 +566,7 @@ const Invoices = () => {
             ) : (
               <>
                 <i className="fas fa-check"></i>
-                Completar Venta
+                Registrar Pedido
               </>
             )}
           </button>
